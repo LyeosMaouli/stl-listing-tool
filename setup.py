@@ -65,6 +65,9 @@ setup(
             "flake8>=6.0.0",
             "mypy>=1.5.0",
         ],
+        "gui": [
+            "tkinterdnd2>=0.3.0",  # Drag and drop support for GUI
+        ],
         "blender": [
             "bpy>=3.6.0",  # Blender Python API (when available)
         ],
@@ -76,6 +79,7 @@ setup(
         "console_scripts": [
             "stl-processor=cli:cli",
             "stl-proc=cli:cli",  # Shorter alias
+            "stl-gui=gui:main",  # GUI launcher
         ],
     },
     include_package_data=True,
