@@ -1,0 +1,20 @@
+# Minimal requirements for core functionality
+# Use this if you encounter issues with the full requirements.txt
+
+# Essential for STL processing
+trimesh>=4.0.0
+numpy>=1.21.0
+
+# Essential for CLI
+click>=8.0.0
+
+# Essential for configuration
+pydantic>=1.10.0
+
+# Essential for testing
+pytest>=7.0.0
+
+# Optional but recommended
+# vtk>=9.0.0          # For rendering
+# Pillow>=9.0.0       # For image processing
+# numpy-stl>=2.0.0    # Alternative STL library
