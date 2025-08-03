@@ -2,8 +2,17 @@ import vtk
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional
-from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-from ..utils.logger import logger
+import sys
+
+# Handle both package and direct imports
+try:
+    from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
+    from ..utils.logger import logger
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
+    from utils.logger import setup_logger
+    logger = setup_logger("vtk_renderer")
 
 
 class VTKRenderer(BaseRenderer):
