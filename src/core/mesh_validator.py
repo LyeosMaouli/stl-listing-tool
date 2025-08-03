@@ -181,8 +181,8 @@ class MeshValidator:
             if not self.mesh.is_watertight:
                 self._add_issue("warning", "not_watertight", "Mesh is not watertight")
                 
-            if not self.mesh.is_valid:
-                self._add_issue("warning", "not_valid", "Mesh fails trimesh validity check")
+            if not self.mesh.is_volume:
+                self._add_issue("warning", "not_valid", "Mesh does not represent a valid volume")
                 
         except Exception as e:
             self._add_issue("warning", "manifold_check_failed", f"Manifold check failed: {e}")
@@ -247,9 +247,9 @@ class MeshValidator:
         """Check for self-intersections (computationally expensive)."""
         try:
             # This is a basic check - full self-intersection detection is complex
-            if hasattr(self.mesh, 'is_valid') and not self.mesh.is_valid:
+            if not self.mesh.is_volume:
                 self._add_issue("warning", "potential_self_intersection", 
-                              "Mesh may have self-intersections")
+                              "Mesh may have self-intersections or invalid volume")
                 
         except Exception as e:
             self._add_issue("warning", "intersection_check_failed", f"Self-intersection check failed: {e}")
@@ -300,7 +300,7 @@ class MeshValidator:
                 "face_count": len(self.mesh.faces),
                 "edge_count": len(self.mesh.edges) if hasattr(self.mesh, 'edges') else None,
                 "is_watertight": bool(self.mesh.is_watertight),
-                "is_valid": bool(self.mesh.is_valid),
+                "is_valid": bool(self.mesh.is_volume),
                 "volume": float(self.mesh.volume) if self.mesh.is_volume else None,
                 "surface_area": float(self.mesh.area),
                 "bounding_box": self.mesh.bounds.tolist()

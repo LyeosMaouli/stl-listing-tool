@@ -114,7 +114,7 @@ class DimensionExtractor:
                 "min_face_area": float(np.min(face_areas)) if len(face_areas) > 0 else 0.0,
                 "max_face_area": float(np.max(face_areas)) if len(face_areas) > 0 else 0.0,
                 "avg_face_area": float(np.mean(face_areas)) if len(face_areas) > 0 else 0.0,
-                "is_valid": bool(self.mesh.is_valid),
+                "is_valid": bool(self.mesh.is_volume),
                 "is_convex": bool(self.mesh.is_convex)
             }
         except Exception as e:
