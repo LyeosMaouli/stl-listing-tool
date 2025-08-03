@@ -102,7 +102,7 @@ class STLProcessorGUI:
         
         self.drop_area = tk.Label(drop_frame, text="Drop STL files here", 
                                  bg="lightgray", fg="gray", 
-                                 border=2, relief="dashed", height=3)
+                                 border=2, relief="ridge", height=3)
         self.drop_area.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
     def create_notebook(self):
