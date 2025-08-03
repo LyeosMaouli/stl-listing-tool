@@ -14,7 +14,7 @@ else:
     requirements = [
         'trimesh[easy]>=4.0.0',
         'numpy-stl>=3.0.0',
-        'open3d>=0.17.0',
+        'open3d>=0.19.0',
         'vtk>=9.2.0',
         'moviepy>=1.0.3',
         'Pillow>=10.0.0',

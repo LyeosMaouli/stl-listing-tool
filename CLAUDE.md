@@ -42,7 +42,16 @@ pip install -e .[dev,gpu]
 
 # Install dependencies only
 pip install -r requirements.txt
+
+# If you encounter package version conflicts, try minimal install:
+pip install -r requirements-minimal.txt
 ```
+
+**Troubleshooting Installation:**
+- If `open3d` version conflicts occur, the package uses `>=0.19.0` (latest available)
+- If `vtk` causes issues on some systems, it's optional for basic STL processing
+- Use `requirements-minimal.txt` for core functionality only
+- Windows users may need Visual Studio C++ Build Tools for some packages
 
 ### Testing
 ```bash
