@@ -5,15 +5,34 @@ import threading
 import json
 from typing import Optional, Dict, Any
 import sys
+import os
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Ensure we can import from the src directory
+current_dir = Path(__file__).parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
 
-from core.stl_processor import STLProcessor
-from core.dimension_extractor import DimensionExtractor
-from core.mesh_validator import MeshValidator, ValidationLevel
-from rendering.vtk_renderer import VTKRenderer
-from rendering.base_renderer import MaterialType, LightingPreset
-from utils.logger import setup_logger
+# Also add parent directory to handle package imports
+parent_dir = current_dir.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
+try:
+    # Try package-style imports first
+    from src.core.stl_processor import STLProcessor
+    from src.core.dimension_extractor import DimensionExtractor
+    from src.core.mesh_validator import MeshValidator, ValidationLevel
+    from src.rendering.vtk_renderer import VTKRenderer
+    from src.rendering.base_renderer import MaterialType, LightingPreset
+    from src.utils.logger import setup_logger
+except ImportError:
+    # Fall back to direct imports
+    from core.stl_processor import STLProcessor
+    from core.dimension_extractor import DimensionExtractor
+    from core.mesh_validator import MeshValidator, ValidationLevel
+    from rendering.vtk_renderer import VTKRenderer
+    from rendering.base_renderer import MaterialType, LightingPreset
+    from utils.logger import setup_logger
 
 logger = setup_logger("stl_processor_gui")
 

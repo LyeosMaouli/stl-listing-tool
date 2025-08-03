@@ -1,7 +1,16 @@
 import trimesh
 import numpy as np
 from typing import Dict, List, Union, Tuple, Optional
-from ..utils.logger import logger
+from pathlib import Path
+
+# Handle both package and direct imports
+try:
+    from ..utils.logger import logger
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from utils.logger import setup_logger
+    logger = setup_logger("dimension_extractor")
 
 
 class DimensionExtractor:
