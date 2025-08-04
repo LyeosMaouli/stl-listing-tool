@@ -6,22 +6,13 @@ import json
 from typing import Optional, Dict, Any
 import os
 
-try:
-    # Try relative imports first (for package installation)
-    from .core.stl_processor import STLProcessor
-    from .core.dimension_extractor import DimensionExtractor
-    from .core.mesh_validator import MeshValidator, ValidationLevel
-    from .rendering.vtk_renderer import VTKRenderer
-    from .rendering.base_renderer import MaterialType, LightingPreset
-    from .utils.logger import setup_logger
-except ImportError:
-    # Fall back to absolute imports (for direct script execution)
-    from core.stl_processor import STLProcessor
-    from core.dimension_extractor import DimensionExtractor
-    from core.mesh_validator import MeshValidator, ValidationLevel
-    from rendering.vtk_renderer import VTKRenderer
-    from rendering.base_renderer import MaterialType, LightingPreset
-    from utils.logger import setup_logger
+# Use absolute imports for entry point compatibility
+from core.stl_processor import STLProcessor
+from core.dimension_extractor import DimensionExtractor
+from core.mesh_validator import MeshValidator, ValidationLevel
+from rendering.vtk_renderer import VTKRenderer
+from rendering.base_renderer import MaterialType, LightingPreset
+from utils.logger import setup_logger
 
 logger = setup_logger("stl_processor_gui")
 
