@@ -5,12 +5,9 @@ import tempfile
 import trimesh
 
 # Import modules to test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from core.stl_processor import STLProcessor
-from core.dimension_extractor import DimensionExtractor
-from core.mesh_validator import MeshValidator, ValidationLevel
+from src.core.stl_processor import STLProcessor
+from src.core.dimension_extractor import DimensionExtractor
+from src.core.mesh_validator import MeshValidator, ValidationLevel
 
 
 @pytest.fixture

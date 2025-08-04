@@ -3,14 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 import numpy as np
 
-# Handle both package and direct imports
-try:
-    from ..utils.logger import logger
-except ImportError:
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from utils.logger import setup_logger
-    logger = setup_logger("stl_processor")
+from ..utils.logger import logger
 
 
 class STLProcessor:
