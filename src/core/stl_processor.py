@@ -80,7 +80,7 @@ class STLProcessor:
             logger.info(f"Mesh stats: {len(self.mesh.vertices)} vertices, {len(self.mesh.faces)} faces")
             
             # Check and fix mesh issues
-            if not self.mesh.is_valid:
+            if not self.mesh.is_volume:
                 logger.warning("Mesh has integrity issues, attempting repairs")
                 
                 # Fix normals
@@ -97,7 +97,7 @@ class STLProcessor:
                     self.mesh.fill_holes()
             
             # Final validity check
-            is_valid = self.mesh.is_valid
+            is_valid = self.mesh.is_volume
             if is_valid:
                 logger.info("Mesh validation successful")
             else:
@@ -135,7 +135,7 @@ class STLProcessor:
                 "bounding_box_min": self.mesh.bounds[0].tolist(),
                 "bounding_box_max": self.mesh.bounds[1].tolist(),
                 "is_watertight": bool(self.mesh.is_watertight),
-                "is_valid": bool(self.mesh.is_valid),
+                "is_valid": bool(self.mesh.is_volume),
                 "vertex_count": int(len(self.mesh.vertices)),
                 "face_count": int(len(self.mesh.faces))
             }
