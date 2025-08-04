@@ -14,6 +14,7 @@ class STLProcessor:
     def __init__(self):
         self.mesh: Optional[trimesh.Trimesh] = None
         self.filepath: Optional[Path] = None
+        self.last_error: Optional[Exception] = None
         
     def load(self, filepath: Union[str, Path]) -> bool:
         """
@@ -48,6 +49,7 @@ class STLProcessor:
         except Exception as e:
             logger.error(f"Failed to load {filepath}: {e}")
             self.mesh = None
+            self.last_error = e
             return False
     
     def validate(self) -> bool:
@@ -100,6 +102,7 @@ class STLProcessor:
             
         except Exception as e:
             logger.error(f"Error during mesh validation: {e}")
+            self.last_error = e
             return False
     
     def get_dimensions(self) -> Dict[str, Union[float, list]]:
