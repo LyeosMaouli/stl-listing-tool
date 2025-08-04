@@ -5,11 +5,8 @@ import tempfile
 import trimesh
 
 # Import modules to test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from rendering.vtk_renderer import VTKRenderer
-from rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
+from src.rendering.vtk_renderer import VTKRenderer
+from src.rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
 
 
 @pytest.fixture

@@ -4,35 +4,14 @@ from pathlib import Path
 import threading
 import json
 from typing import Optional, Dict, Any
-import sys
 import os
 
-# Ensure we can import from the src directory
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
-
-# Also add parent directory to handle package imports
-parent_dir = current_dir.parent
-if str(parent_dir) not in sys.path:
-    sys.path.insert(0, str(parent_dir))
-
-try:
-    # Try package-style imports first
-    from src.core.stl_processor import STLProcessor
-    from src.core.dimension_extractor import DimensionExtractor
-    from src.core.mesh_validator import MeshValidator, ValidationLevel
-    from src.rendering.vtk_renderer import VTKRenderer
-    from src.rendering.base_renderer import MaterialType, LightingPreset
-    from src.utils.logger import setup_logger
-except ImportError:
-    # Fall back to direct imports
-    from core.stl_processor import STLProcessor
-    from core.dimension_extractor import DimensionExtractor
-    from core.mesh_validator import MeshValidator, ValidationLevel
-    from rendering.vtk_renderer import VTKRenderer
-    from rendering.base_renderer import MaterialType, LightingPreset
-    from utils.logger import setup_logger
+from .core.stl_processor import STLProcessor
+from .core.dimension_extractor import DimensionExtractor
+from .core.mesh_validator import MeshValidator, ValidationLevel
+from .rendering.vtk_renderer import VTKRenderer
+from .rendering.base_renderer import MaterialType, LightingPreset
+from .utils.logger import setup_logger
 
 logger = setup_logger("stl_processor_gui")
 
@@ -250,8 +229,16 @@ class STLProcessorGUI:
             self.root = TkinterDnD.Tk()
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
+            self.dnd_available = True
         except ImportError:
-            pass
+            self.dnd_available = False
+            logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            # Update drop area to show drag-and-drop is unavailable
+            self.drop_area.config(
+                text="Drag-and-drop unavailable\nUse Browse button instead",
+                bg="lightyellow",
+                fg="darkgray"
+            )
             
     def browse_file(self):
         file_path = filedialog.askopenfilename(

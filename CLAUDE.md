@@ -8,7 +8,15 @@ This is the `stl-listing-tool` project, a Python-based STL file processing tool 
 
 ## Current State
 
-The project has completed **Phase 1-2** of the development plan with core functionality implemented:
+The project has core functionality implemented with **critical deployment issues now resolved** (August 2025):
+
+**✅ CRITICAL FIXES IMPLEMENTED**:
+- ✅ Setup.py entry points corrected - console commands now work after installation
+- ✅ Import system standardized with proper package structure
+- ✅ Configuration updated to modern Pydantic v2 API
+- ✅ GUI dependencies handle graceful degradation
+
+**Project Status**: Ready for installation and basic use. See `/docs/fixes/` directory for implementation details and remaining improvement opportunities.
 
 ### Implemented Components
 - ✅ **Core STL Processing** (`src/core/`)
@@ -33,6 +41,8 @@ The project has completed **Phase 1-2** of the development plan with core functi
 ## Development Commands
 
 ### Installation
+
+**✅ FIXED**: Critical installation issues have been resolved. Package is now ready for installation.
 ```bash
 # Install package in development mode
 pip install -e .
@@ -46,6 +56,12 @@ pip install -r requirements.txt
 # If you encounter package version conflicts, try minimal install:
 pip install -r requirements-minimal.txt
 ```
+
+**Installation Notes**:
+- Console commands (stl-processor, stl-gui) now work correctly
+- Import system uses proper package structure
+- GUI gracefully handles missing tkinterdnd2 dependency
+- Configuration system uses modern Pydantic v2 API
 
 **Troubleshooting Installation:**
 - If `open3d` version conflicts occur, the package uses `>=0.19.0` (latest available)
@@ -69,6 +85,8 @@ pytest --cov=src
 ```
 
 ### CLI Usage
+
+**✅ WORKING**: CLI commands now function correctly after installation.
 ```bash
 # Analyze STL file
 stl-processor analyze model.stl
@@ -82,6 +100,7 @@ stl-processor render model.stl output.png --material plastic --lighting studio
 # Calculate scale information
 stl-processor scale model.stl --height 28
 ```
+
 
 ## Architecture
 
@@ -139,8 +158,14 @@ stl_processor/
 - All STL files are processed defensively with comprehensive validation
 - Rendering system supports multiple backends (VTK implemented, Blender planned)
 - CLI interface follows Unix conventions with clear error handling
-- Extensive test coverage ensures reliability across different mesh types
-- Configuration system allows easy customization of processing parameters
+- Test coverage needs expansion (GUI and CLI not currently tested)
+- Configuration system allows easy customization but needs Pydantic v2 update
+
+**✅ RESOLVED**: Critical deployment issues have been fixed. See `/docs/fixes/` for:
+- Complete implementation details of applied fixes
+- Remaining improvement opportunities (high-priority items)
+- Future enhancement roadmap
+- Testing and validation procedures
 
 ## Development Guidelines
 
