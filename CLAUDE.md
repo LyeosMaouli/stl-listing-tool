@@ -8,7 +8,15 @@ This is the `stl-listing-tool` project, a Python-based STL file processing tool 
 
 ## Current State
 
-The project has completed **Phase 1-2** of the development plan with core functionality implemented:
+The project has core functionality implemented but **requires critical fixes** before deployment:
+
+**⚠️ CRITICAL ISSUES IDENTIFIED (August 2025)**:
+- Setup.py entry points are incorrect - console commands won't work after installation
+- Import system inconsistencies throughout codebase  
+- Configuration uses deprecated Pydantic API
+- Missing GUI dependencies cause silent failures
+
+**See `/docs/fixes/` directory for complete issue analysis and fix plans.**
 
 ### Implemented Components
 - ✅ **Core STL Processing** (`src/core/`)
@@ -33,6 +41,10 @@ The project has completed **Phase 1-2** of the development plan with core functi
 ## Development Commands
 
 ### Installation
+
+**⚠️ WARNING**: Package currently has critical installation issues. Do not attempt installation until fixes are applied.
+
+**After fixes are implemented:**
 ```bash
 # Install package in development mode
 pip install -e .
@@ -46,6 +58,12 @@ pip install -r requirements.txt
 # If you encounter package version conflicts, try minimal install:
 pip install -r requirements-minimal.txt
 ```
+
+**Current Installation Issues** (see `/docs/fixes/` for details):
+- Console commands (stl-processor, stl-gui) will not work due to incorrect entry points
+- Import system requires manual sys.path manipulation
+- GUI drag-and-drop may fail silently without tkinterdnd2
+- Configuration system uses deprecated Pydantic API
 
 **Troubleshooting Installation:**
 - If `open3d` version conflicts occur, the package uses `>=0.19.0` (latest available)
@@ -69,6 +87,10 @@ pytest --cov=src
 ```
 
 ### CLI Usage
+
+**⚠️ Note**: CLI commands currently don't work due to setup.py entry point issues.
+
+**Expected usage after fixes:**
 ```bash
 # Analyze STL file
 stl-processor analyze model.stl
@@ -81,6 +103,12 @@ stl-processor render model.stl output.png --material plastic --lighting studio
 
 # Calculate scale information
 stl-processor scale model.stl --height 28
+```
+
+**Current workaround:**
+```bash
+cd /path/to/stl-processor
+python -m src.cli analyze model.stl
 ```
 
 ## Architecture
@@ -139,8 +167,14 @@ stl_processor/
 - All STL files are processed defensively with comprehensive validation
 - Rendering system supports multiple backends (VTK implemented, Blender planned)
 - CLI interface follows Unix conventions with clear error handling
-- Extensive test coverage ensures reliability across different mesh types
-- Configuration system allows easy customization of processing parameters
+- Test coverage needs expansion (GUI and CLI not currently tested)
+- Configuration system allows easy customization but needs Pydantic v2 update
+
+**⚠️ CRITICAL**: This project currently has deployment-blocking issues. See `/docs/fixes/` for:
+- Complete issue analysis and priority assessment
+- Detailed fix plans for all identified problems  
+- Implementation roadmap with timelines
+- Risk assessment and mitigation strategies
 
 ## Development Guidelines
 
