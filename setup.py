@@ -77,9 +77,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "stl-processor=src.cli:cli",
-            "stl-proc=src.cli:cli",  # Shorter alias
-            "stl-gui=src.gui:main",  # GUI launcher
+            "stl-processor=cli:cli",
+            "stl-proc=cli:cli",  # Shorter alias
+            "stl-gui=gui:main",  # GUI launcher
         ],
     },
     include_package_data=True,

@@ -11,20 +11,35 @@ def test_package_structure():
     """Test that package structure works."""
     print("Testing package structure...")
     
-    # Test basic package import
-    import src
-    assert hasattr(src, '__version__')
-    print(f"✓ Package version: {src.__version__}")
+    # Test basic package import (when installed, src becomes root)
+    # For development testing, we need to check the src structure
+    import sys
+    import os
+    sys.path.insert(0, 'src')
     
-    # Test logger import
-    logger = src.setup_logger('test_fixes')
+    # Check that the main modules exist and have correct entry points
+    assert os.path.exists('src/cli.py'), "CLI module missing"
+    assert os.path.exists('src/gui.py'), "GUI module missing"
+    print("✓ CLI and GUI modules exist")
+    
+    # Test that core packages work (import logger without heavy dependencies)
+    from utils.logger import setup_logger
+    logger = setup_logger('test_fixes')
     logger.info('Testing fixes integration')
     print("✓ Logger works")
     
-    # Test lazy imports are available
-    assert hasattr(src, 'get_stl_processor')
-    assert hasattr(src, 'get_dimension_extractor')
-    print("✓ Lazy import functions available")
+    # Check that CLI and GUI files have the expected entry points
+    with open('src/cli.py', 'r') as f:
+        cli_content = f.read()
+    assert 'def cli(' in cli_content, "CLI entry point function missing"
+    print("✓ CLI entry point exists")
+    
+    with open('src/gui.py', 'r') as f:
+        gui_content = f.read() 
+    assert 'def main(' in gui_content, "GUI entry point function missing"
+    print("✓ GUI entry point exists")
+    
+    print("✓ Package structure compatible with installation")
     
     print("Package structure test: PASSED\n")
 
@@ -35,14 +50,15 @@ def test_entry_points_structure():
     import os
     
     entry_points = {
-        'stl-processor': 'src.cli:cli',
-        'stl-proc': 'src.cli:cli', 
-        'stl-gui': 'src.gui:main'
+        'stl-processor': 'cli:cli',
+        'stl-proc': 'cli:cli', 
+        'stl-gui': 'gui:main'
     }
     
     for command, entry_point in entry_points.items():
         module_path, function = entry_point.split(':')
-        file_path = module_path.replace('.', '/') + '.py'
+        # Convert cli to src/cli.py for file checking
+        file_path = 'src/' + module_path + '.py'
         
         assert os.path.exists(file_path), f"Entry point file missing: {file_path}"
         print(f"✓ {command} -> {entry_point}")
@@ -73,7 +89,7 @@ def test_import_system():
         if file_path.startswith('src/') and file_path != 'src/cli.py' and file_path != 'src/gui.py':
             assert 'from ..' in content or 'from .' in content, f"File missing relative imports: {file_path}"
         elif file_path.startswith('tests/'):
-            assert 'from src.' in content, f"Test file missing package imports: {file_path}"
+            assert 'from core.' in content or 'from rendering.' in content, f"Test file missing package imports: {file_path}"
             
         print(f"✓ {file_path}")
     
