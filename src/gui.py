@@ -13,6 +13,7 @@ from core.mesh_validator import MeshValidator, ValidationLevel
 from rendering.vtk_renderer import VTKRenderer
 from rendering.base_renderer import MaterialType, LightingPreset
 from utils.logger import setup_logger
+from error_dialog import show_comprehensive_error
 
 logger = setup_logger("stl_processor_gui")
 
@@ -223,7 +224,12 @@ class STLProcessorGUI:
                 if file_path.suffix.lower() == '.stl':
                     self.load_file(file_path)
                 else:
-                    messagebox.showerror("Error", "Please select an STL file")
+                    show_comprehensive_error(
+                        self.root, 
+                        "Invalid File Type", 
+                        "Please select an STL file",
+                        context={"attempted_file": str(file_path), "file_extension": file_path.suffix}
+                    )
                     
         try:
             from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -251,7 +257,17 @@ class STLProcessorGUI:
             
     def load_file(self, file_path: Path):
         if not file_path.exists():
-            messagebox.showerror("Error", f"File not found: {file_path}")
+            show_comprehensive_error(
+                self.root,
+                "File Not Found",
+                f"The selected file does not exist: {file_path}",
+                context={
+                    "file_path": str(file_path),
+                    "parent_directory": str(file_path.parent),
+                    "parent_exists": file_path.parent.exists(),
+                    "current_working_directory": str(Path.cwd())
+                }
+            )
             return
             
         self.current_file = file_path
@@ -259,8 +275,33 @@ class STLProcessorGUI:
         self.status_var.set(f"Loaded: {file_path.name}")
         
         self.processor = STLProcessor()
-        if not self.processor.load(file_path):
-            messagebox.showerror("Error", f"Failed to load STL file: {file_path}")
+        try:
+            if not self.processor.load(file_path):
+                show_comprehensive_error(
+                    self.root,
+                    "STL Loading Failed", 
+                    f"Failed to load STL file: {file_path}",
+                    context={
+                        "file_path": str(file_path),
+                        "file_size": file_path.stat().st_size if file_path.exists() else "Unknown",
+                        "file_extension": file_path.suffix,
+                        "processor_state": "Failed during load operation"
+                    }
+                )
+                return
+        except Exception as e:
+            show_comprehensive_error(
+                self.root,
+                "STL Loading Error",
+                f"An exception occurred while loading STL file: {file_path}",
+                exception=e,
+                context={
+                    "file_path": str(file_path),
+                    "file_size": file_path.stat().st_size if file_path.exists() else "Unknown",
+                    "file_extension": file_path.suffix,
+                    "operation": "STL file loading"
+                }
+            )
             return
             
         logger.info(f"Loaded STL file: {file_path}")
@@ -292,7 +333,18 @@ class STLProcessorGUI:
                 
             except Exception as e:
                 logger.error(f"Analysis error: {e}")
-                messagebox.showerror("Error", f"Analysis failed: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Analysis Failed",
+                    f"Analysis failed during processing: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "STL analysis",
+                        "processor_loaded": self.processor is not None,
+                        "analysis_stage": "dimension_extraction_or_analysis"
+                    }
+                )
                 self.status_var.set("Analysis failed")
             finally:
                 self.progress_var.set(0)
@@ -361,7 +413,18 @@ class STLProcessorGUI:
                         
                 messagebox.showinfo("Success", f"Analysis exported to {file_path}")
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to export: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Export Failed",
+                    f"Failed to export analysis results: {str(e)}",
+                    exception=e,
+                    context={
+                        "export_file_path": str(file_path),
+                        "export_format": path.suffix.lower(),
+                        "has_analysis_results": self.analysis_results is not None,
+                        "operation": "analysis export"
+                    }
+                )
                 
     def validate_file(self):
         if not self.current_file or not self.processor:
@@ -390,7 +453,19 @@ class STLProcessorGUI:
                 
             except Exception as e:
                 logger.error(f"Validation error: {e}")
-                messagebox.showerror("Error", f"Validation failed: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Validation Failed",
+                    f"Mesh validation failed: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "mesh validation",
+                        "validation_level": self.validation_level.get(),
+                        "auto_repair_enabled": self.repair_var.get(),
+                        "processor_loaded": self.processor is not None
+                    }
+                )
                 self.status_var.set("Validation failed")
             finally:
                 self.progress_var.set(0)
@@ -474,7 +549,21 @@ class STLProcessorGUI:
                 
             except Exception as e:
                 logger.error(f"Render error: {e}")
-                messagebox.showerror("Error", f"Rendering failed: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Rendering Failed",
+                    f"Image rendering failed: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "image rendering",
+                        "render_width": self.width_var.get(),
+                        "render_height": self.height_var.get(),
+                        "material_type": self.material_var.get(),
+                        "lighting_preset": self.lighting_var.get(),
+                        "processor_loaded": self.processor is not None
+                    }
+                )
                 self.status_var.set("Render failed")
             finally:
                 self.progress_var.set(0)
@@ -516,7 +605,17 @@ class STLProcessorGUI:
                     shutil.copy(temp_path, file_path)
                     messagebox.showinfo("Success", f"Image saved to {file_path}")
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save image: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Save Failed",
+                    f"Failed to save rendered image: {str(e)}",
+                    exception=e,
+                    context={
+                        "save_file_path": str(file_path),
+                        "temp_file_exists": Path("/tmp/stl_render.png").exists(),
+                        "operation": "image save"
+                    }
+                )
                 
     def show_about(self):
         about_text = """STL Listing Tool v1.0
