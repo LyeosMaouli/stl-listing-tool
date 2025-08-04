@@ -277,10 +277,13 @@ class STLProcessorGUI:
         self.processor = STLProcessor()
         try:
             if not self.processor.load(file_path):
+                # Get the actual exception if available
+                exception = self.processor.last_error
                 show_comprehensive_error(
                     self.root,
                     "STL Loading Failed", 
                     f"Failed to load STL file: {file_path}",
+                    exception=exception,
                     context={
                         "file_path": str(file_path),
                         "file_size": file_path.stat().st_size if file_path.exists() else "Unknown",
