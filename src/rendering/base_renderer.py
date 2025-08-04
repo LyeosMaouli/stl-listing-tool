@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 import numpy as np
 from enum import Enum
 
-from ..utils.logger import logger
+from utils.logger import logger
 
 
 class MaterialType(Enum):
