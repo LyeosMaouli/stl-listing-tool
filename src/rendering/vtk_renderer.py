@@ -3,8 +3,8 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional
 
-from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-from ..utils.logger import logger
+from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
+from utils.logger import logger
 
 
 class VTKRenderer(BaseRenderer):
