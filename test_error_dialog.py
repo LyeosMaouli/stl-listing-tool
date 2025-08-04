@@ -110,8 +110,10 @@ if __name__ == "__main__":
     frame = tk.Frame(root, padx=20, pady=20)
     frame.pack(fill=tk.BOTH, expand=True)
     
-    tk.Label(frame, text="Error Dialog Test", font=("Arial", 16, "bold")).pack(pady=10)
+    tk.Label(frame, text="Enhanced Error Dialog Test", font=("Arial", 16, "bold")).pack(pady=10)
     tk.Label(frame, text="Click a button to test different error scenarios:").pack(pady=5)
+    tk.Label(frame, text="New features: Always centers on screen, 'Copy All Text' button, 'Save as .log' option", 
+             font=("Arial", 9), fg="blue", wraplength=350).pack(pady=5)
     
     tk.Button(frame, text="File Not Found Error", 
              command=test_file_not_found_error, width=25).pack(pady=5)
