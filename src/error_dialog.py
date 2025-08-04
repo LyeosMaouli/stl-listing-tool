@@ -56,19 +56,24 @@ class ComprehensiveErrorDialog:
         self.dialog.focus_set()
         
     def center_dialog(self):
-        """Center the dialog on the parent window."""
+        """Center the dialog on the screen (not just parent window)."""
         self.dialog.update_idletasks()
         
-        parent_x = self.parent.winfo_x()
-        parent_y = self.parent.winfo_y()
-        parent_width = self.parent.winfo_width()
-        parent_height = self.parent.winfo_height()
+        # Get screen dimensions
+        screen_width = self.dialog.winfo_screenwidth()
+        screen_height = self.dialog.winfo_screenheight()
         
+        # Get dialog dimensions
         dialog_width = self.dialog.winfo_width()
         dialog_height = self.dialog.winfo_height()
         
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        # Calculate center position
+        x = (screen_width - dialog_width) // 2
+        y = (screen_height - dialog_height) // 2
+        
+        # Ensure dialog doesn't go off-screen
+        x = max(0, min(x, screen_width - dialog_width))
+        y = max(0, min(y, screen_height - dialog_height))
         
         self.dialog.geometry(f"+{x}+{y}")
         
@@ -370,31 +375,189 @@ class ComprehensiveErrorDialog:
                 return ["Recent log entries not available (logger doesn't support buffering)"]
         except Exception:
             return ["Could not retrieve recent log entries"]
+    
+    def get_all_dialog_text(self) -> str:
+        """Get all text content from all tabs in the dialog."""
+        all_text = []
+        
+        # Header information
+        all_text.append("=" * 80)
+        all_text.append(f"ERROR DIALOG CONTENT - {self.error_title}")
+        all_text.append("=" * 80)
+        all_text.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        all_text.append("")
+        
+        # Summary from header
+        all_text.append("ERROR SUMMARY:")
+        all_text.append("-" * 40)
+        all_text.append(self.error_message)
+        all_text.append("")
+        
+        # Error Details tab content
+        if hasattr(self, 'traceback_text'):
+            all_text.append("ERROR DETAILS:")
+            all_text.append("-" * 40)
+            
+            if self.exception:
+                all_text.append(f"Exception Type: {type(self.exception).__name__}")
+                all_text.append(f"Exception Message: {str(self.exception)}")
+                all_text.append("")
+            
+            all_text.append("Full Traceback:")
+            try:
+                traceback_content = self.traceback_text.get(1.0, tk.END).strip()
+                all_text.append(traceback_content)
+            except:
+                all_text.append("Could not retrieve traceback content")
+            all_text.append("")
+        
+        # Context tab content
+        all_text.append("CONTEXT INFORMATION:")
+        all_text.append("-" * 40)
+        
+        # Add provided context
+        if self.context:
+            all_text.append("Application Context:")
+            for key, value in self.context.items():
+                all_text.append(f"  {key}: {value}")
+            all_text.append("")
+        
+        # File context if available
+        if 'file_path' in self.context:
+            file_path = Path(self.context['file_path'])
+            all_text.append("File Information:")
+            all_text.append(f"  File Path: {file_path}")
+            all_text.append(f"  File Exists: {file_path.exists() if file_path else 'N/A'}")
+            if file_path and file_path.exists():
+                try:
+                    stat = file_path.stat()
+                    all_text.append(f"  File Size: {stat.st_size:,} bytes")
+                    all_text.append(f"  Last Modified: {datetime.fromtimestamp(stat.st_mtime)}")
+                    all_text.append(f"  File Extension: {file_path.suffix}")
+                except Exception as e:
+                    all_text.append(f"  Could not get file stats: {e}")
+            all_text.append("")
+        
+        # Recent log entries
+        all_text.append("Recent Log Entries:")
+        try:
+            log_entries = self.get_recent_log_entries()
+            all_text.extend(log_entries)
+        except Exception as e:
+            all_text.append(f"Could not retrieve log entries: {e}")
+        all_text.append("")
+        
+        # System Information
+        all_text.append("SYSTEM INFORMATION:")
+        all_text.append("-" * 40)
+        all_text.append(f"Platform: {platform.platform()}")
+        all_text.append(f"Python Version: {sys.version}")
+        all_text.append(f"Python Executable: {sys.executable}")
+        all_text.append(f"Working Directory: {Path.cwd()}")
+        all_text.append("")
+        
+        # Module versions
+        all_text.append("Installed Packages:")
+        key_modules = ['tkinter', 'trimesh', 'numpy', 'vtk', 'PIL', 'open3d']
+        for module_name in key_modules:
+            try:
+                module = __import__(module_name)
+                version = getattr(module, '__version__', 'Unknown')
+                all_text.append(f"  {module_name}: {version}")
+            except ImportError:
+                all_text.append(f"  {module_name}: Not installed")
+            except Exception as e:
+                all_text.append(f"  {module_name}: Error - {e}")
+        all_text.append("")
+        
+        # Suggestions
+        suggestions = self.generate_suggestions()
+        all_text.extend(suggestions)
+        
+        return "\n".join(all_text)
         
     def create_buttons(self):
         """Create the dialog buttons.""" 
         button_frame = ttk.Frame(self.dialog, padding="20")
         button_frame.pack(fill=tk.X)
         
-        # Copy to clipboard button
-        copy_button = ttk.Button(button_frame, text="Copy to Clipboard", 
-                                command=self.copy_to_clipboard)
-        copy_button.pack(side=tk.LEFT, padx=(0, 10))
+        # Left side buttons (actions)
+        left_buttons = ttk.Frame(button_frame)
+        left_buttons.pack(side=tk.LEFT)
         
-        # Always enable copy button - we have a fallback method
+        # Copy all text button (primary copy function)
+        copy_all_button = ttk.Button(left_buttons, text="Copy All Text", 
+                                    command=self.copy_all_text)
+        copy_all_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Save to file button
-        save_button = ttk.Button(button_frame, text="Save Error Report", 
-                                command=self.save_error_report)
-        save_button.pack(side=tk.LEFT, padx=(0, 10))
+        # Copy structured report button (original functionality)
+        copy_report_button = ttk.Button(left_buttons, text="Copy Error Report", 
+                                       command=self.copy_to_clipboard)
+        copy_report_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Save as .log file button
+        save_log_button = ttk.Button(left_buttons, text="Save as .log", 
+                                    command=self.save_as_log_file)
+        save_log_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Save full report button (original functionality)
+        save_report_button = ttk.Button(left_buttons, text="Save Full Report", 
+                                       command=self.save_error_report)
+        save_report_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Right side buttons (navigation)
+        right_buttons = ttk.Frame(button_frame)
+        right_buttons.pack(side=tk.RIGHT)
         
         # Close button
-        close_button = ttk.Button(button_frame, text="Close", command=self.close_dialog)
+        close_button = ttk.Button(right_buttons, text="Close", command=self.close_dialog)
         close_button.pack(side=tk.RIGHT)
         
         # Make close button default
         self.dialog.bind('<Return>', lambda e: self.close_dialog())
         self.dialog.bind('<Escape>', lambda e: self.close_dialog())
+    
+    def copy_all_text(self):
+        """Copy all text content from the dialog to clipboard."""
+        try:
+            all_text = self.get_all_dialog_text()
+            
+            if CLIPBOARD_AVAILABLE:
+                pyperclip.copy(all_text)
+                messagebox.showinfo("Copied", "All dialog text copied to clipboard!", parent=self.dialog)
+            else:
+                # Fallback: use tkinter clipboard
+                self.dialog.clipboard_clear()
+                self.dialog.clipboard_append(all_text)
+                self.dialog.update()  # Now it stays on the clipboard after the window is closed
+                messagebox.showinfo("Copied", "All dialog text copied to clipboard!\n(Using fallback method)", parent=self.dialog)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to copy all text to clipboard: {e}", parent=self.dialog)
+    
+    def save_as_log_file(self):
+        """Save all dialog content as a .log file."""
+        try:
+            from tkinter import filedialog
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"error_log_{timestamp}.log"
+            
+            file_path = filedialog.asksaveasfilename(
+                parent=self.dialog,
+                title="Save Error Log",
+                defaultextension=".log",
+                filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
+                initialname=default_filename
+            )
+            
+            if file_path:
+                all_text = self.get_all_dialog_text()
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(all_text)
+                messagebox.showinfo("Saved", f"Error log saved to {file_path}", parent=self.dialog)
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save log file: {e}", parent=self.dialog)
         
     def copy_to_clipboard(self):
         """Copy all error information to clipboard."""
