@@ -36,8 +36,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/terragon-labs/stl-listing-tool",
-    packages=["stl_processor"] + ["stl_processor." + pkg for pkg in find_packages(where="src")],
-    package_dir={"stl_processor": "src"},
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -77,9 +77,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "stl-processor=stl_processor.cli:cli",
-            "stl-proc=stl_processor.cli:cli",  # Shorter alias
-            "stl-gui=stl_processor.gui:main",  # GUI launcher
+            "stl-processor=cli:cli",
+            "stl-proc=cli:cli",  # Shorter alias
+            "stl-gui=gui:main",  # GUI launcher
         ],
     },
     include_package_data=True,
