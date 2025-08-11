@@ -18,6 +18,50 @@ from error_dialog import show_comprehensive_error
 
 logger = setup_logger("stl_processor_gui")
 
+def show_error_with_logging(parent, title, message, exception=None, context=None):
+    """Wrapper for show_comprehensive_error that adds debugging logs and fixes image path bugs."""
+    logger.info(f"=== ERROR DIALOG CALLED ===")
+    logger.info(f"Title: {title}")
+    logger.info(f"Message: {message}")
+    logger.info(f"Exception: {exception}")
+    logger.info(f"Context keys: {list(context.keys()) if context else None}")
+    
+    # Fix: Check if message IS an image path and fix it
+    original_message = message
+    if str(message).strip().startswith('/tmp/images/') or (len(str(message)) < 200 and '/tmp/images/' in str(message)):
+        logger.error(f"CRITICAL BUG DETECTED: Error message is an image path! Original: {message}")
+        logger.error(f"This indicates a bug where an image path was passed as error message")
+        
+        # Generate a better error message
+        fixed_message = f"An error occurred during rendering or image processing. The system attempted to save or access an image file, but the operation failed."
+        
+        # Add the path to context instead
+        if context is None:
+            context = {}
+        context['detected_image_path'] = str(message)
+        context['error_message_fix_applied'] = 'Image path was incorrectly passed as error message'
+        
+        message = fixed_message
+        logger.info(f"Fixed error message: {message}")
+    
+    # Check if exception string contains image path
+    if exception and '/tmp/images/' in str(exception):
+        logger.error(f"CRITICAL: Exception contains image path! Exception: {exception}")
+    
+    # Check context for image paths (this is normal/expected)
+    if context:
+        for key, value in context.items():
+            if '/tmp/images/' in str(value):
+                logger.info(f"Context key '{key}' contains image path: {value} (this may be normal)")
+    
+    if original_message != message:
+        logger.info(f"Applied error message fix: '{original_message}' -> '{message}'")
+    
+    logger.info(f"=== END ERROR DIALOG INFO ===")
+    
+    # Call the actual error dialog
+    show_comprehensive_error(parent, title, message, exception, context)
+
 
 class STLProcessorGUI:
     def __init__(self, root):
@@ -237,7 +281,7 @@ class STLProcessorGUI:
                 if file_path.suffix.lower() == '.stl':
                     self.load_file(file_path)
                 else:
-                    show_comprehensive_error(
+                    show_error_with_logging(
                         self.root, 
                         "Invalid File Type", 
                         "Please select an STL file",
@@ -269,7 +313,7 @@ class STLProcessorGUI:
             
     def load_file(self, file_path: Path):
         if not file_path.exists():
-            show_comprehensive_error(
+            show_error_with_logging(
                 self.root,
                 "File Not Found",
                 f"The selected file does not exist: {file_path}",
@@ -291,7 +335,7 @@ class STLProcessorGUI:
             if not self.processor.load(file_path):
                 # Get the actual exception if available
                 exception = self.processor.last_error
-                show_comprehensive_error(
+                show_error_with_logging(
                     self.root,
                     "STL Loading Failed", 
                     f"Failed to load STL file: {file_path}",
@@ -553,18 +597,21 @@ class STLProcessorGUI:
                 self.status_var.set("Rendering...")
                 
                 temp_path = self.get_temp_render_path()
+                logger.info(f"Starting render to temp path: {temp_path}")
                 if renderer.render(temp_path):
+                    logger.info(f"Render successful, displaying image from: {temp_path}")
                     self.display_rendered_image(temp_path)
                     self.progress_var.set(100)
                     self.status_var.set("Render complete")
                 else:
+                    logger.error(f"Renderer returned False for path: {temp_path}")
                     raise Exception("Render failed")
                     
                 renderer.cleanup()
                 
             except Exception as e:
                 logger.error(f"Render error: {e}")
-                show_comprehensive_error(
+                show_error_with_logging(
                     self.root,
                     "Rendering Failed",
                     f"Image rendering failed: {str(e)}",
@@ -595,11 +642,16 @@ class STLProcessorGUI:
             photo = ImageTk.PhotoImage(image)
             self.render_display.config(image=photo, text="")
             self.render_display.image = photo
+            logger.info(f"Successfully displayed rendered image: {image_path}")
             
         except ImportError:
-            self.render_display.config(text=f"Rendered image saved to:\n{image_path}")
+            fallback_text = f"Rendered image saved to:\n{image_path}"
+            self.render_display.config(text=fallback_text)
+            logger.info(f"PIL not available, showing fallback text: {fallback_text}")
         except Exception as e:
-            self.render_display.config(text=f"Error displaying image: {e}")
+            error_text = f"Error displaying image: {e}"
+            self.render_display.config(text=error_text)
+            logger.error(f"Error displaying image {image_path}: {e}")
             
     def save_render(self):
         if not hasattr(self.render_display, 'image'):
