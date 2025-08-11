@@ -54,4 +54,4 @@ def setup_logger(
 
 
 # Default logger instance
-logger = setup_logger()
+logger = setup_logger(log_level="DEBUG")

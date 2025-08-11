@@ -38,13 +38,24 @@ class STLProcessor:
             
             logger.info(f"Loading STL file: {filepath}")
             self.mesh = trimesh.load(str(self.filepath))
+            logger.debug(f"Loaded object type: {type(self.mesh)}")
+            logger.debug(f"Loaded object: {self.mesh}")
             
             # Ensure we have a Trimesh object
             if not isinstance(self.mesh, trimesh.Trimesh):
-                logger.error(f"Loaded object is not a valid mesh: {type(self.mesh)}")
+                error_msg = f"Loaded object is not a valid mesh: {type(self.mesh)}"
+                logger.error(error_msg)
+                self.last_error = Exception(error_msg)
                 return False
                 
-            return self.validate()
+            validation_result = self.validate()
+            if not validation_result:
+                # If validation failed but no specific error was set, create one
+                if self.last_error is None:
+                    error_msg = "Mesh validation failed - see logs for details"
+                    logger.error(error_msg)
+                    self.last_error = Exception(error_msg)
+            return validation_result
             
         except Exception as e:
             logger.error(f"Failed to load {filepath}: {e}")
@@ -60,7 +71,9 @@ class STLProcessor:
             bool: True if mesh is valid or successfully repaired
         """
         if self.mesh is None:
-            logger.error("No mesh loaded for validation")
+            error_msg = "No mesh loaded for validation"
+            logger.error(error_msg)
+            self.last_error = Exception(error_msg)
             return False
             
         try:
@@ -68,7 +81,9 @@ class STLProcessor:
             
             # Check if mesh is empty
             if len(self.mesh.vertices) == 0 or len(self.mesh.faces) == 0:
-                logger.error("Mesh is empty (no vertices or faces)")
+                error_msg = "Mesh is empty (no vertices or faces)"
+                logger.error(error_msg)
+                self.last_error = Exception(error_msg)
                 return False
             
             # Log mesh stats
@@ -96,7 +111,9 @@ class STLProcessor:
             if is_valid:
                 logger.info("Mesh validation successful")
             else:
-                logger.warning("Mesh still has integrity issues after repair attempts")
+                error_msg = "Mesh still has integrity issues after repair attempts - not a valid watertight volume"
+                logger.warning(error_msg)
+                self.last_error = Exception(error_msg)
                 
             return is_valid
             
