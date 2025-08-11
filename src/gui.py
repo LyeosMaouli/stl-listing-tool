@@ -612,6 +612,7 @@ class STLProcessorGUI:
             return
             
         def run_render():
+            renderer = None
             try:
                 self.status_var.set("Setting up renderer...")
                 self.progress_var.set(20)
@@ -619,7 +620,26 @@ class STLProcessorGUI:
                 width = int(self.width_var.get())
                 height = int(self.height_var.get())
                 
+                logger.info(f"Creating VTK renderer with dimensions: {width}x{height}")
                 renderer = VTKRenderer(width, height)
+                
+                # Explicitly initialize the renderer first
+                logger.info("Initializing VTK renderer...")
+                if not renderer.initialize():
+                    raise Exception("Failed to initialize VTK renderer")
+                
+                # Verify the renderer window size after initialization
+                if hasattr(renderer, 'render_window') and renderer.render_window:
+                    actual_size = renderer.render_window.GetSize()
+                    logger.info(f"Renderer initialized with actual window size: {actual_size[0]}x{actual_size[1]}")
+                    
+                    # If size doesn't match, force set it again
+                    if actual_size[0] != width or actual_size[1] != height:
+                        logger.warning(f"Window size mismatch! Expected {width}x{height}, got {actual_size[0]}x{actual_size[1]}")
+                        renderer.render_window.SetSize(width, height)
+                        renderer.render_window.Modified()
+                        final_size = renderer.render_window.GetSize()
+                        logger.info(f"Forced window size to: {final_size[0]}x{final_size[1]}")
                 
                 self.progress_var.set(40)
                 self.status_var.set("Loading mesh...")
@@ -641,6 +661,12 @@ class STLProcessorGUI:
                 
                 temp_path = self.get_temp_render_path()
                 logger.info(f"Starting render to temp path: {temp_path}")
+                
+                # Final window size check before rendering
+                if hasattr(renderer, 'render_window') and renderer.render_window:
+                    pre_render_size = renderer.render_window.GetSize()
+                    logger.info(f"Window size before render: {pre_render_size[0]}x{pre_render_size[1]}")
+                
                 if renderer.render(temp_path):
                     logger.info(f"Render successful, displaying image from: {temp_path}")
                     self.display_rendered_image(temp_path)
@@ -649,8 +675,6 @@ class STLProcessorGUI:
                 else:
                     logger.error(f"Renderer returned False for path: {temp_path}")
                     raise Exception("Render failed")
-                    
-                renderer.cleanup()
                 
             except Exception as e:
                 logger.error(f"Render error: {e}")
@@ -671,6 +695,13 @@ class STLProcessorGUI:
                 )
                 self.status_var.set("Render failed")
             finally:
+                # Ensure proper cleanup of renderer resources
+                if renderer:
+                    try:
+                        logger.info("Cleaning up renderer resources...")
+                        renderer.cleanup()
+                    except Exception as cleanup_error:
+                        logger.warning(f"Error during renderer cleanup: {cleanup_error}")
                 self.progress_var.set(0)
                 
         threading.Thread(target=run_render, daemon=True).start()

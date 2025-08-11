@@ -37,19 +37,49 @@ class VTKRenderer(BaseRenderer):
             
             # Create render window
             self.render_window = vtk.vtkRenderWindow()
-            self.render_window.SetOffScreenRendering(1)  # Enable off-screen rendering first
-            self.render_window.SetSize(self.width, self.height)  # Set size after off-screen rendering
-            self.render_window.AddRenderer(self.renderer)
             
-            # Force the window size to be set correctly
-            self.render_window.Modified()
+            # Try different initialization approaches for better compatibility
+            try:
+                # Method 1: Standard off-screen rendering
+                self.render_window.SetOffScreenRendering(1)
+                self.render_window.SetSize(self.width, self.height)
+                self.render_window.AddRenderer(self.renderer)
+                self.render_window.Modified()
+                
+                # Test if the window size was set correctly
+                test_size = self.render_window.GetSize()
+                if test_size[0] != self.width or test_size[1] != self.height:
+                    logger.warning(f"Initial size setting failed: got {test_size[0]}x{test_size[1]}, expected {self.width}x{self.height}")
+                    
+                    # Force size setting multiple times if needed
+                    for attempt in range(3):
+                        self.render_window.SetSize(self.width, self.height)
+                        self.render_window.Modified()
+                        current_size = self.render_window.GetSize()
+                        if current_size[0] == self.width and current_size[1] == self.height:
+                            logger.info(f"Window size set correctly on attempt {attempt + 1}")
+                            break
+                        logger.warning(f"Attempt {attempt + 1}: size still {current_size[0]}x{current_size[1]}")
+                    
+            except Exception as init_error:
+                logger.error(f"Standard initialization failed: {init_error}, trying fallback")
+                # Method 2: Fallback initialization
+                self.render_window = vtk.vtkRenderWindow()
+                self.render_window.AddRenderer(self.renderer)
+                self.render_window.SetOffScreenRendering(1)
+                self.render_window.SetSize(self.width, self.height)
+                self.render_window.Modified()
             
             # Create camera
             self.camera = self.renderer.GetActiveCamera()
             
-            # Verify initialization
+            # Final verification
             actual_size = self.render_window.GetSize()
-            logger.debug(f"VTK render window initialized with actual size: {actual_size[0]}x{actual_size[1]}")
+            logger.info(f"VTK render window initialized with final size: {actual_size[0]}x{actual_size[1]}")
+            
+            if actual_size[0] != self.width or actual_size[1] != self.height:
+                logger.error(f"CRITICAL: Window size verification failed! Expected {self.width}x{self.height}, got {actual_size[0]}x{actual_size[1]}")
+                # Still mark as initialized but log the discrepancy
             
             self.is_initialized = True
             logger.info("VTK renderer initialized successfully")
