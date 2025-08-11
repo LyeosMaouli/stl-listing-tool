@@ -390,7 +390,13 @@ class ComprehensiveErrorDialog:
         # Summary from header
         all_text.append("ERROR SUMMARY:")
         all_text.append("-" * 40)
-        all_text.append(self.error_message)
+        # Debug: Check if error_message contains image path
+        if '/tmp/images/' in str(self.error_message):
+            logger.warning(f"Error message appears to contain image path: {self.error_message}")
+            all_text.append("WARNING: Error message contains image path - this may indicate a bug")
+            all_text.append(f"Original message: {self.error_message}")
+        else:
+            all_text.append(self.error_message)
         all_text.append("")
         
         # Error Details tab content
@@ -551,10 +557,21 @@ class ComprehensiveErrorDialog:
             )
             
             if file_path:
+                # Get the error log content (not image paths)
                 all_text = self.get_all_dialog_text()
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(all_text)
-                messagebox.showinfo("Saved", f"Error log saved to {file_path}", parent=self.dialog)
+                
+                # Debug: Ensure we're not accidentally saving image paths
+                if all_text and not (all_text.strip().startswith('/tmp/images/') or '/tmp/images/' in all_text[:100]):
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(all_text)
+                    messagebox.showinfo("Saved", f"Error log saved to {file_path}", parent=self.dialog)
+                else:
+                    # Fallback: Generate fresh error report if content appears corrupted
+                    logger.warning(f"Dialog text appears corrupted (contains image paths), generating fresh error report. Detected content start: {all_text[:200] if all_text else 'None'}")
+                    fresh_report = self.generate_full_error_report()
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(fresh_report)
+                    messagebox.showinfo("Saved", f"Error log saved to {file_path} (used fallback report due to corrupted content)", parent=self.dialog)
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save log file: {e}", parent=self.dialog)
