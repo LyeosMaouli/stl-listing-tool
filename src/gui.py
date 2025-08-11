@@ -245,8 +245,7 @@ class STLProcessorGUI:
                     )
                     
         try:
-            from tkinterdnd2 import TkinterDnD, DND_FILES
-            self.root = TkinterDnD.Tk()
+            from tkinterdnd2 import DND_FILES
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
             self.dnd_available = True
