@@ -710,8 +710,41 @@ class STLProcessorGUI:
         try:
             from PIL import Image, ImageTk
             
+            logger.info(f"Loading rendered image from: {image_path}")
             image = Image.open(image_path)
-            image.thumbnail((600, 400), Image.Resampling.LANCZOS)
+            original_size = image.size
+            logger.info(f"Original image size: {original_size[0]}x{original_size[1]}")
+            
+            # Get the actual display widget size instead of using hardcoded values
+            self.render_display.update_idletasks()  # Ensure geometry is calculated
+            
+            # Get widget dimensions (convert from characters to pixels approximately)
+            widget_width = self.render_display.winfo_width()
+            widget_height = self.render_display.winfo_height()
+            
+            # If widget hasn't been drawn yet, use reasonable defaults based on window size
+            if widget_width <= 1 or widget_height <= 1:
+                # Fallback: use a reasonable size based on the GUI layout
+                widget_width = 800  # Reasonable default width
+                widget_height = 600  # Reasonable default height
+                logger.info(f"Using fallback display size: {widget_width}x{widget_height}")
+            else:
+                logger.info(f"Display widget actual size: {widget_width}x{widget_height}")
+            
+            # Use the actual available space for thumbnailing, with some padding
+            max_width = widget_width - 20  # Leave 20px padding
+            max_height = widget_height - 20  # Leave 20px padding
+            
+            # Ensure minimum reasonable size
+            max_width = max(400, max_width)
+            max_height = max(300, max_height)
+            
+            logger.info(f"Thumbnailing to max size: {max_width}x{max_height}")
+            
+            # Create thumbnail that maintains aspect ratio
+            image.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            final_size = image.size
+            logger.info(f"Final display image size: {final_size[0]}x{final_size[1]}")
             
             photo = ImageTk.PhotoImage(image)
             self.render_display.config(image=photo, text="")
