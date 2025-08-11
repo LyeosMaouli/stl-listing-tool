@@ -602,7 +602,6 @@ class ComprehensiveErrorDialog:
                         f.write(fresh_report)
                     messagebox.showinfo("Saved", f"Error log saved to {file_path} (used fallback report due to corrupted content)", parent=self.dialog)
                     logger.info("Successfully saved fallback report")
-                
         except Exception as e:
             logger.error(f"Failed to save log file: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to save log file: {e}", parent=self.dialog)
