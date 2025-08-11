@@ -566,7 +566,7 @@ class ComprehensiveErrorDialog:
                 title="Save Error Log",
                 defaultextension=".log",
                 filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")],
-                initialname=default_filename
+                initialfile=default_filename
             )
             
             if file_path:
@@ -636,7 +636,7 @@ class ComprehensiveErrorDialog:
                 title="Save Error Report",
                 defaultextension=".txt",
                 filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-                initialname=default_filename
+                initialfile=default_filename
             )
             
             if file_path:
