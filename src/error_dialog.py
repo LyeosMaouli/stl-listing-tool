@@ -30,6 +30,13 @@ class ComprehensiveErrorDialog:
         self.exception = exception
         self.context = context or {}
         
+        # Debug logging for error dialog creation
+        logger.info(f"Creating error dialog: title='{error_title}', message='{error_message[:100]}{'...' if len(error_message) > 100 else ''}'")
+        if '/tmp/images/' in str(error_message):
+            logger.error(f"ERROR: Image path detected in error message during dialog creation: {error_message}")
+            logger.error(f"Context: {self.context}")
+            logger.error(f"Exception: {exception}")
+        
         self.dialog = None
         self.create_dialog()
         
@@ -545,6 +552,12 @@ class ComprehensiveErrorDialog:
         try:
             from tkinter import filedialog
             
+            # Debug logging at start of save operation
+            logger.info("Starting save_as_log_file operation")
+            logger.info(f"Error title: {self.error_title}")
+            logger.info(f"Error message: {self.error_message}")
+            logger.info(f"Context keys: {list(self.context.keys()) if self.context else 'None'}")
+            
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             default_filename = f"error_log_{timestamp}.log"
             
@@ -557,23 +570,40 @@ class ComprehensiveErrorDialog:
             )
             
             if file_path:
+                logger.info(f"User selected save path: {file_path}")
+                
                 # Get the error log content (not image paths)
                 all_text = self.get_all_dialog_text()
+                logger.info(f"Generated dialog text length: {len(all_text) if all_text else 0}")
+                logger.info(f"Dialog text preview (first 200 chars): {all_text[:200] if all_text else 'None'}")
                 
                 # Debug: Ensure we're not accidentally saving image paths
-                if all_text and not (all_text.strip().startswith('/tmp/images/') or '/tmp/images/' in all_text[:100]):
+                contains_image_path = '/tmp/images/' in all_text[:500] if all_text else False
+                starts_with_image_path = all_text.strip().startswith('/tmp/images/') if all_text else False
+                
+                logger.info(f"Content analysis: starts_with_image_path={starts_with_image_path}, contains_image_path={contains_image_path}")
+                
+                if all_text and not (starts_with_image_path or contains_image_path):
+                    logger.info("Saving normal dialog text")
                     with open(file_path, 'w', encoding='utf-8') as f:
                         f.write(all_text)
                     messagebox.showinfo("Saved", f"Error log saved to {file_path}", parent=self.dialog)
+                    logger.info("Successfully saved normal dialog text")
                 else:
                     # Fallback: Generate fresh error report if content appears corrupted
-                    logger.warning(f"Dialog text appears corrupted (contains image paths), generating fresh error report. Detected content start: {all_text[:200] if all_text else 'None'}")
+                    logger.warning(f"Dialog text appears corrupted (contains image paths), generating fresh error report")
+                    logger.warning(f"Corrupted content preview: {all_text[:500] if all_text else 'None'}")
+                    
                     fresh_report = self.generate_full_error_report()
+                    logger.info(f"Generated fresh report length: {len(fresh_report)}")
+                    logger.info(f"Fresh report preview: {fresh_report[:200]}")
+                    
                     with open(file_path, 'w', encoding='utf-8') as f:
                         f.write(fresh_report)
                     messagebox.showinfo("Saved", f"Error log saved to {file_path} (used fallback report due to corrupted content)", parent=self.dialog)
-                
+                    logger.info("Successfully saved fallback report")
         except Exception as e:
+            logger.error(f"Failed to save log file: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to save log file: {e}", parent=self.dialog)
         
     def copy_to_clipboard(self):
