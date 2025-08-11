@@ -8,11 +8,25 @@ import os
 import tempfile
 
 # Use absolute imports for entry point compatibility
-from core.stl_processor import STLProcessor
-from core.dimension_extractor import DimensionExtractor
-from core.mesh_validator import MeshValidator, ValidationLevel
-from rendering.vtk_renderer import VTKRenderer
-from rendering.base_renderer import MaterialType, LightingPreset
+try:
+    from core.stl_processor import STLProcessor
+    from core.dimension_extractor import DimensionExtractor
+    from core.mesh_validator import MeshValidator, ValidationLevel
+    CORE_MODULES_AVAILABLE = True
+    CORE_IMPORT_ERROR = None
+except ImportError as e:
+    CORE_MODULES_AVAILABLE = False
+    CORE_IMPORT_ERROR = e
+
+try:
+    from rendering.vtk_renderer import VTKRenderer
+    from rendering.base_renderer import MaterialType, LightingPreset
+    RENDERING_MODULES_AVAILABLE = True
+    RENDERING_IMPORT_ERROR = None
+except ImportError as e:
+    RENDERING_MODULES_AVAILABLE = False
+    RENDERING_IMPORT_ERROR = e
+
 from utils.logger import setup_logger
 from error_dialog import show_comprehensive_error
 
@@ -330,6 +344,21 @@ class STLProcessorGUI:
         self.file_var.set(str(file_path))
         self.status_var.set(f"Loaded: {file_path.name}")
         
+        # Check if core modules are available before proceeding
+        if not CORE_MODULES_AVAILABLE:
+            show_error_with_logging(
+                self.root,
+                "Missing Dependencies", 
+                "STL processing dependencies are not installed. Please run 'pip install -r requirements.txt' to install required packages.",
+                exception=CORE_IMPORT_ERROR,
+                context={
+                    "file_path": str(file_path),
+                    "missing_modules": "core STL processing modules",
+                    "import_error": str(CORE_IMPORT_ERROR)
+                }
+            )
+            return
+
         self.processor = STLProcessor()
         try:
             if not self.processor.load(file_path):
@@ -566,6 +595,20 @@ class STLProcessorGUI:
     def render_image(self):
         if not self.current_file or not self.processor:
             messagebox.showwarning("Warning", "Please select an STL file first")
+            return
+            
+        # Check if rendering modules are available
+        if not RENDERING_MODULES_AVAILABLE:
+            show_error_with_logging(
+                self.root,
+                "Missing Rendering Dependencies", 
+                "Rendering dependencies are not installed. Please run 'pip install vtk' to enable rendering.",
+                exception=RENDERING_IMPORT_ERROR,
+                context={
+                    "missing_modules": "VTK rendering modules",
+                    "import_error": str(RENDERING_IMPORT_ERROR)
+                }
+            )
             return
             
         def run_render():
