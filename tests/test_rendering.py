@@ -243,7 +243,8 @@ class TestRendererErrorHandling:
         """Test scene setup with invalid file."""
         renderer = VTKRenderer()
         
-        invalid_path = Path("/tmp/nonexistent_file.stl")
+        import tempfile
+        invalid_path = Path(tempfile.gettempdir()) / "nonexistent_file.stl"
         result = renderer.setup_scene(invalid_path)
         
         assert result is False

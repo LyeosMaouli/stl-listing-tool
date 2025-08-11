@@ -44,7 +44,8 @@ def sample_stl_file():
 @pytest.fixture
 def invalid_stl_file():
     """Create a path to a non-existent STL file."""
-    return Path("/tmp/nonexistent_file.stl")
+    import tempfile
+    return Path(tempfile.gettempdir()) / "nonexistent_file.stl"
 
 
 class TestSTLProcessor:

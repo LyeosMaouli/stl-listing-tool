@@ -5,6 +5,7 @@ import threading
 import json
 from typing import Optional, Dict, Any
 import os
+import tempfile
 
 # Use absolute imports for entry point compatibility
 from core.stl_processor import STLProcessor
@@ -31,6 +32,18 @@ class STLProcessorGUI:
         
         self.setup_ui()
         self.setup_drag_drop()
+    
+    def get_temp_render_path(self):
+        """Get a safe temporary path for rendering output."""
+        temp_dir = Path(tempfile.gettempdir())
+        # Ensure the temp directory exists
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Also ensure /tmp/images exists (for any potential screenshot functionality)
+        images_dir = temp_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        
+        return temp_dir / "stl_render.png"
         
     def setup_ui(self):
         self.create_menu()
@@ -540,7 +553,7 @@ class STLProcessorGUI:
                 self.progress_var.set(80)
                 self.status_var.set("Rendering...")
                 
-                temp_path = Path("/tmp/stl_render.png")
+                temp_path = self.get_temp_render_path()
                 if renderer.render(temp_path):
                     self.display_rendered_image(temp_path)
                     self.progress_var.set(100)
@@ -602,7 +615,7 @@ class STLProcessorGUI:
         
         if file_path and hasattr(self.render_display, 'image'):
             try:
-                temp_path = Path("/tmp/stl_render.png")
+                temp_path = self.get_temp_render_path()
                 if temp_path.exists():
                     import shutil
                     shutil.copy(temp_path, file_path)
@@ -615,7 +628,7 @@ class STLProcessorGUI:
                     exception=e,
                     context={
                         "save_file_path": str(file_path),
-                        "temp_file_exists": Path("/tmp/stl_render.png").exists(),
+                        "temp_file_exists": self.get_temp_render_path().exists(),
                         "operation": "image save"
                     }
                 )
