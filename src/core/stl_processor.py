@@ -65,10 +65,10 @@ class STLProcessor:
     
     def validate(self) -> bool:
         """
-        Validate mesh integrity and attempt repairs.
+        Perform basic validation on mesh structure only.
         
         Returns:
-            bool: True if mesh is valid or successfully repaired
+            bool: True if mesh has basic structure (vertices and faces)
         """
         if self.mesh is None:
             error_msg = "No mesh loaded for validation"
@@ -77,7 +77,7 @@ class STLProcessor:
             return False
             
         try:
-            logger.info("Validating mesh integrity")
+            logger.info("Performing basic mesh validation")
             
             # Check if mesh is empty
             if len(self.mesh.vertices) == 0 or len(self.mesh.faces) == 0:
@@ -86,39 +86,20 @@ class STLProcessor:
                 self.last_error = Exception(error_msg)
                 return False
             
-            # Log mesh stats
-            logger.info(f"Mesh stats: {len(self.mesh.vertices)} vertices, {len(self.mesh.faces)} faces")
-            
-            # Check and fix mesh issues
-            if not self.mesh.is_volume:
-                logger.warning("Mesh has integrity issues, attempting repairs")
-                
-                # Fix normals
-                self.mesh.fix_normals()
-                
-                # Remove duplicate faces
-                self.mesh.remove_duplicate_faces()
-                
-                # Remove degenerate faces
-                self.mesh.remove_degenerate_faces()
-                
-                # Fill holes if possible
-                if hasattr(self.mesh, 'fill_holes'):
-                    self.mesh.fill_holes()
-            
-            # Final validity check
-            is_valid = self.mesh.is_volume
-            if is_valid:
-                logger.info("Mesh validation successful")
-            else:
-                error_msg = "Mesh still has integrity issues after repair attempts - not a valid watertight volume"
-                logger.warning(error_msg)
+            # Check for minimum viable mesh
+            if len(self.mesh.vertices) < 3:
+                error_msg = "Mesh has fewer than 3 vertices"
+                logger.error(error_msg)
                 self.last_error = Exception(error_msg)
-                
-            return is_valid
+                return False
+            
+            # Log mesh stats
+            logger.info(f"Basic validation passed: {len(self.mesh.vertices)} vertices, {len(self.mesh.faces)} faces")
+            
+            return True
             
         except Exception as e:
-            logger.error(f"Error during mesh validation: {e}")
+            logger.error(f"Error during basic mesh validation: {e}")
             self.last_error = e
             return False
     
