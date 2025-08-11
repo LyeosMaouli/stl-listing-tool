@@ -172,12 +172,15 @@ class ComprehensiveErrorDialog:
         
         # Get and display traceback
         if self.exception:
-            tb_lines = traceback.format_exception(type(self.exception), self.exception, 
-                                                 self.exception.__traceback__)
-            traceback_str = "".join(tb_lines)
+            try:
+                tb_lines = traceback.format_exception(type(self.exception), self.exception, 
+                                                     self.exception.__traceback__)
+                traceback_str = "".join(tb_lines)
+            except Exception as e:
+                traceback_str = f"Error formatting exception traceback: {str(e)}\nOriginal exception: {str(self.exception)}"
         else:
-            # Get current traceback if no exception provided
-            traceback_str = "".join(traceback.format_stack())
+            # Don't use format_stack() as it can cause recursive errors in error dialogs
+            traceback_str = "No traceback available - error occurred without exception details"
         
         self.traceback_text.config(state=tk.NORMAL)
         self.traceback_text.insert(1.0, traceback_str)
