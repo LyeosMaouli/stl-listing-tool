@@ -29,6 +29,7 @@ except ImportError as e:
 
 from utils.logger import setup_logger
 from error_dialog import show_comprehensive_error
+from user_config import get_user_config
 
 logger = setup_logger("stl_processor_gui")
 
@@ -88,8 +89,119 @@ class STLProcessorGUI:
         self.processor = None
         self.analysis_results = None
         
+        # Initialize user config
+        self.user_config = get_user_config()
+        
         self.setup_ui()
         self.setup_drag_drop()
+        self.load_user_settings()
+        
+        # Save window geometry on close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+    def load_user_settings(self):
+        """Load saved user settings from config file."""
+        try:
+            # Load validation settings
+            if hasattr(self, 'validation_level'):
+                saved_level = self.user_config.get('validation_level', 'standard')
+                self.validation_level.set(saved_level)
+            
+            if hasattr(self, 'repair_var'):
+                saved_repair = self.user_config.get('auto_repair', False)
+                self.repair_var.set(saved_repair)
+            
+            # Load rendering settings
+            if hasattr(self, 'material_var'):
+                saved_material = self.user_config.get('render_material', 'plastic')
+                self.material_var.set(saved_material)
+            
+            if hasattr(self, 'lighting_var'):
+                saved_lighting = self.user_config.get('render_lighting', 'studio')
+                self.lighting_var.set(saved_lighting)
+            
+            if hasattr(self, 'width_var'):
+                saved_width = self.user_config.get('render_width', '1920')
+                self.width_var.set(str(saved_width))
+            
+            if hasattr(self, 'height_var'):
+                saved_height = self.user_config.get('render_height', '1080')
+                self.height_var.set(str(saved_height))
+            
+            # Load background image path
+            saved_background = self.user_config.get('background_image_path')
+            if saved_background and Path(saved_background).exists():
+                self.background_path = Path(saved_background)
+                filename = self.background_path.name
+                if len(filename) > 40:
+                    filename = filename[:37] + "..."
+                self.background_var.set(f"Selected: {filename}")
+                if hasattr(self, 'update_background_preview'):
+                    self.update_background_preview()
+            
+            # Load window geometry
+            saved_geometry = self.user_config.get('window_geometry')
+            if saved_geometry:
+                self.root.geometry(saved_geometry)
+            
+            logger.info("User settings loaded successfully")
+            
+        except Exception as e:
+            logger.error(f"Error loading user settings: {e}")
+    
+    def save_setting(self, key: str, value: Any):
+        """Save a single setting to user config."""
+        try:
+            self.user_config.set(key, value, auto_save=True)
+        except Exception as e:
+            logger.error(f"Error saving setting {key}={value}: {e}")
+    
+    def on_validation_level_changed(self, *args):
+        """Called when validation level changes."""
+        self.save_setting('validation_level', self.validation_level.get())
+    
+    def on_repair_var_changed(self):
+        """Called when auto repair checkbox changes."""
+        self.save_setting('auto_repair', self.repair_var.get())
+    
+    def on_material_changed(self, *args):
+        """Called when material selection changes."""
+        self.save_setting('render_material', self.material_var.get())
+    
+    def on_lighting_changed(self, *args):
+        """Called when lighting selection changes."""
+        self.save_setting('render_lighting', self.lighting_var.get())
+    
+    def on_width_changed(self, *args):
+        """Called when render width changes."""
+        try:
+            width = int(self.width_var.get())
+            self.save_setting('render_width', width)
+        except ValueError:
+            pass  # Invalid input, don't save
+    
+    def on_height_changed(self, *args):
+        """Called when render height changes."""
+        try:
+            height = int(self.height_var.get())
+            self.save_setting('render_height', height)
+        except ValueError:
+            pass  # Invalid input, don't save
+    
+    def save_window_geometry(self):
+        """Save current window geometry."""
+        try:
+            geometry = self.root.geometry()
+            self.save_setting('window_geometry', geometry)
+        except Exception as e:
+            logger.error(f"Error saving window geometry: {e}")
+    
+    def on_closing(self):
+        """Handle window closing event."""
+        # Save window geometry before closing
+        self.save_window_geometry()
+        # Close the application
+        self.root.destroy()
     
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""
@@ -201,10 +313,13 @@ class STLProcessorGUI:
         level_combo = ttk.Combobox(controls_frame, textvariable=self.validation_level,
                                   values=["basic", "standard", "strict"], state="readonly")
         level_combo.pack(side=tk.LEFT, padx=(0, 10))
+        # Connect change handler
+        self.validation_level.trace('w', self.on_validation_level_changed)
         
         self.repair_var = tk.BooleanVar()
-        ttk.Checkbutton(controls_frame, text="Auto Repair", 
-                       variable=self.repair_var).pack(side=tk.LEFT, padx=(0, 10))
+        repair_checkbox = ttk.Checkbutton(controls_frame, text="Auto Repair", 
+                                         variable=self.repair_var, command=self.on_repair_var_changed)
+        repair_checkbox.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(controls_frame, text="Validate", 
                   command=self.validate_file).pack(side=tk.LEFT)
@@ -233,6 +348,8 @@ class STLProcessorGUI:
                                      values=["plastic", "metal", "resin", "ceramic", "wood", "glass"],
                                      state="readonly")
         material_combo.grid(row=0, column=1, padx=(0, 20))
+        # Connect change handler
+        self.material_var.trace('w', self.on_material_changed)
         
         ttk.Label(settings_frame, text="Lighting:").grid(row=0, column=2, sticky=tk.W, padx=(0, 10))
         self.lighting_var = tk.StringVar(value="studio")
@@ -240,6 +357,8 @@ class STLProcessorGUI:
                                      values=["studio", "natural", "dramatic", "soft"],
                                      state="readonly")
         lighting_combo.grid(row=0, column=3, padx=(0, 20))
+        # Connect change handler
+        self.lighting_var.trace('w', self.on_lighting_changed)
         
         ttk.Label(settings_frame, text="Size:").grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(10, 0))
         size_frame = ttk.Frame(settings_frame)
@@ -248,9 +367,15 @@ class STLProcessorGUI:
         self.width_var = tk.StringVar(value="1920")
         self.height_var = tk.StringVar(value="1080")
         
-        ttk.Entry(size_frame, textvariable=self.width_var, width=8).pack(side=tk.LEFT)
+        width_entry = ttk.Entry(size_frame, textvariable=self.width_var, width=8)
+        width_entry.pack(side=tk.LEFT)
         ttk.Label(size_frame, text=" x ").pack(side=tk.LEFT)
-        ttk.Entry(size_frame, textvariable=self.height_var, width=8).pack(side=tk.LEFT)
+        height_entry = ttk.Entry(size_frame, textvariable=self.height_var, width=8)
+        height_entry.pack(side=tk.LEFT)
+        
+        # Connect change handlers
+        self.width_var.trace('w', self.on_width_changed)
+        self.height_var.trace('w', self.on_height_changed)
         ttk.Label(size_frame, text=" pixels").pack(side=tk.LEFT)
         
         # Background image selection
@@ -603,6 +728,9 @@ class STLProcessorGUI:
             self.status_var.set(f"Background image selected: {self.background_path.name}")
             logger.info(f"Background image selected: {self.background_path}")
             
+            # Save background image path to config
+            self.save_setting('background_image_path', str(self.background_path))
+            
             # Show preview thumbnail
             self.update_background_preview()
     
@@ -612,6 +740,9 @@ class STLProcessorGUI:
         self.background_var.set("No background selected")
         self.status_var.set("Background image cleared")
         logger.info("Background image cleared")
+        
+        # Remove background image path from config
+        self.user_config.remove('background_image_path', auto_save=True)
         
         # Clear preview and restore default size
         self.bg_preview.config(image="", text="No preview", width=0, height=0)
