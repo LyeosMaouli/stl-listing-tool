@@ -12,13 +12,13 @@ from typing import Optional, Dict, Any, List
 import os
 
 # Import existing GUI base
-from gui import STLProcessorGUI, show_error_with_logging, CORE_MODULES_AVAILABLE, RENDERING_MODULES_AVAILABLE
+from .gui import STLProcessorGUI, show_error_with_logging, CORE_MODULES_AVAILABLE, RENDERING_MODULES_AVAILABLE
 
 # Import batch processing system
-from batch_queue.enhanced_job_manager import EnhancedJobManager
-from batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
+from .batch_queue.enhanced_job_manager import EnhancedJobManager
+from .batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
 
-from utils.logger import setup_logger
+from .utils.logger import setup_logger
 
 logger = setup_logger("stl_processor_batch_gui")
 
@@ -43,7 +43,7 @@ class BatchProcessingGUI(STLProcessorGUI):
         super().__init__(root)
         
         # Override title
-        self.root.title("STL Listing Tool - Batch Processing")
+        self.root.title("STL Listing Tool")
     
     def setup_ui(self):
         """Override to add batch processing UI elements."""
@@ -181,16 +181,6 @@ class BatchProcessingGUI(STLProcessorGUI):
                               relief="sunken", padding="5")
         file_label.grid(row=0, column=1, sticky=(tk.W, tk.E))
         
-        # Drop area
-        drop_frame = ttk.Frame(file_frame)
-        drop_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
-        drop_frame.columnconfigure(0, weight=1)
-        
-        self.drop_area = tk.Label(drop_frame, text="Drop STL files or folders here", 
-                                 bg="lightgray", fg="gray", 
-                                 border=2, relief="ridge", height=3)
-        self.drop_area.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        
         # Initially show single mode
         self.update_file_selection_for_single()
     
@@ -199,41 +189,15 @@ class BatchProcessingGUI(STLProcessorGUI):
         self.single_browse_btn.grid()
         self.batch_browse_btn.grid_remove()
         
-        if hasattr(self, 'dnd_available') and self.dnd_available:
-            self.drop_area.config(text="Drop STL files here", bg="lightgray", fg="gray")
-        else:
-            self.drop_area.config(text="Drag-and-drop unavailable\nUse Browse File button instead", 
-                                bg="lightyellow", fg="darkgray")
-        
     def update_file_selection_for_batch(self):
         """Update file selection UI for batch mode."""
         self.single_browse_btn.grid_remove()
         self.batch_browse_btn.grid()
-        
-        if hasattr(self, 'dnd_available') and self.dnd_available:
-            self.drop_area.config(text="Drop STL files or folders here", bg="lightgray", fg="gray")
-        else:
-            self.drop_area.config(text="Drag-and-drop unavailable\nUse Browse Folder button instead",
-                                bg="lightyellow", fg="darkgray")
     
     def setup_drag_drop(self):
-        """Override to provide batch-specific drag-drop messaging."""
-        try:
-            # Call parent setup_drag_drop
-            super().setup_drag_drop()
-        except Exception as e:
-            # If parent fails, handle gracefully for batch mode
-            logger.warning(f"Drag-and-drop setup failed: {e}")
-            self.dnd_available = False
-            logger.info("Drag-and-drop disabled. Browse buttons will work normally.")
-            
-            # Update drop area messaging for batch mode
-            if hasattr(self, 'drop_area'):
-                self.drop_area.config(
-                    text="Drag-and-drop unavailable\nUse Browse buttons instead",
-                    bg="lightyellow",
-                    fg="darkgray"
-                )
+        """Drag and drop disabled for this GUI."""
+        # Drag and drop functionality completely removed
+        pass
     
     def browse_folder(self):
         """Browse for folder containing STL files."""

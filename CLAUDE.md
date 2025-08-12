@@ -41,13 +41,15 @@ The project has core functionality implemented with **critical deployment issues
   - `recovery_manager.py`: Session recovery from unexpected shutdowns
   - `progress_tracker.py`: Real-time progress tracking with observer patterns
 
-- ✅ **Batch GUI Integration** (`src/gui_batch.py`)
+- ✅ **Unified GUI** (`src/gui_batch.py`)
+  - Single GUI application for all STL processing needs
   - Mode toggle between single file and batch processing
-  - Enhanced file selection supporting folders and multiple files
+  - Enhanced file selection with browse buttons for files and folders
   - Real-time batch queue management with job list display
   - Queue control buttons (start/pause/stop/clear)
   - Progress visualization with overall and per-job tracking
   - Observer pattern integration for non-blocking UI updates
+  - Drag-and-drop functionality removed for better cross-platform compatibility
 
 - ✅ **Testing & Packaging**
   - `tests/`: Comprehensive test suite with fixtures
@@ -74,9 +76,9 @@ pip install -r requirements-minimal.txt
 ```
 
 **Installation Notes**:
-- Console commands (stl-processor, stl-gui, stl-batch-gui) now work correctly
+- Console commands (stl-processor, stl-gui) now work correctly
 - Import system uses proper package structure
-- GUI gracefully handles missing tkinterdnd2 dependency
+- GUI no longer requires drag-and-drop dependencies
 - Configuration system uses modern Pydantic v2 API
 
 **Troubleshooting Installation:**
@@ -117,8 +119,7 @@ stl-processor render model.stl output.png --material plastic --lighting studio
 stl-processor scale model.stl --height 28
 
 # GUI Applications
-stl-gui                    # Launch single-file processing GUI
-stl-batch-gui             # Launch batch processing GUI (Phase 3 - NEW)
+stl-gui                    # Launch main GUI (supports single file and batch processing)
 
 # Batch processing (Phase 2 - NEW)
 stl-processor batch process-folder ./models/ ./output/ --job-type render
