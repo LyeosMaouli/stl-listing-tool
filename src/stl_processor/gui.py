@@ -27,9 +27,9 @@ except ImportError as e:
     RENDERING_MODULES_AVAILABLE = False
     RENDERING_IMPORT_ERROR = e
 
-from utils.logger import setup_logger
-from error_dialog import show_comprehensive_error
-from user_config import get_user_config
+from .utils.logger import setup_logger
+from .error_dialog import show_comprehensive_error
+from .user_config import get_user_config
 
 logger = setup_logger("stl_processor_gui")
 

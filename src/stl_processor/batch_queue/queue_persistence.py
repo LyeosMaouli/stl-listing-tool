@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 import threading
 import uuid
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 from .job_types import QueueJob, JobState, RenderOptions, ValidationOptions, AnalysisOptions
 
 logger = setup_logger("queue.persistence")

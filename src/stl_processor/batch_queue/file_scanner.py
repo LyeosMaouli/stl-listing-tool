@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import threading
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 
 logger = setup_logger("queue.file_scanner")
 

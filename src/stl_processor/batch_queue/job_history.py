@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import hashlib
 import threading
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 from .job_types import QueueJob, JobResults, JobState
 
 logger = setup_logger("queue.job_history")

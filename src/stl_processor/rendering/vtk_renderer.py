@@ -10,7 +10,7 @@ except ImportError:
     PIL_AVAILABLE = False
 
 from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-from utils.logger import logger
+from ..utils.logger import logger
 
 
 class VTKRenderer(BaseRenderer):

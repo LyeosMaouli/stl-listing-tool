@@ -37,7 +37,6 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/terragon-labs/stl-listing-tool",
     packages=find_packages(where="src"),
-    py_modules=["cli", "gui", "gui_batch", "error_dialog", "user_config"],
     package_dir={"": "src"},
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -78,9 +77,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "stl-processor=cli:cli",
-            "stl-proc=cli:cli",  # Shorter alias
-            "stl-gui=gui_batch:main",  # Main GUI (supports both single and batch)
+            "stl-processor=stl_processor.cli:cli",
+            "stl-proc=stl_processor.cli:cli",  # Shorter alias
+            "stl-gui=stl_processor.gui_batch:main",  # Main GUI (supports both single and batch)
         ],
     },
     include_package_data=True,

@@ -3,12 +3,12 @@ from pathlib import Path
 import json
 from typing import Optional
 
-from core.stl_processor import STLProcessor
-from core.dimension_extractor import DimensionExtractor
-from core.mesh_validator import MeshValidator, ValidationLevel
-from rendering.vtk_renderer import VTKRenderer
-from rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
-from utils.logger import setup_logger
+from .core.stl_processor import STLProcessor
+from .core.dimension_extractor import DimensionExtractor
+from .core.mesh_validator import MeshValidator, ValidationLevel
+from .rendering.vtk_renderer import VTKRenderer
+from .rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
+from .utils.logger import setup_logger
 
 # Setup logger
 logger = setup_logger("stl_processor_cli")
