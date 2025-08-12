@@ -79,7 +79,8 @@ setup(
         "console_scripts": [
             "stl-processor=cli:cli",
             "stl-proc=cli:cli",  # Shorter alias
-            "stl-gui=gui:main",  # GUI launcher
+            "stl-gui=gui:main",  # Original GUI launcher
+            "stl-batch-gui=gui_batch:main",  # Batch processing GUI
         ],
     },
     include_package_data=True,
