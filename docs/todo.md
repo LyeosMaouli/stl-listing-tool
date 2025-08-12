@@ -6,7 +6,7 @@
 
 - [ ] Folder import
 - [ ] Queue
-- [ ] Change rendered saved image path from C:\Users\user\AppData\Local\Temp\stl_render.png to project folder ./tmp
+- [x] Change rendered saved image path from C:\Users\user\AppData\Local\Temp\stl_render.png to project folder ./tmp
 - [x] Custom Background
 - [ ] Size chart
 - [ ] Add "podium"
