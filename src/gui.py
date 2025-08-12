@@ -205,7 +205,12 @@ class STLProcessorGUI:
     
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""
-        temp_dir = Path(tempfile.gettempdir())
+        # Use custom temp directory for stl_listing_tools
+        if os.name == 'nt':  # Windows
+            temp_dir = Path(os.environ.get('LOCALAPPDATA', tempfile.gettempdir())) / "stl_listing_tools" / "tmp"
+        else:  # Unix-like systems
+            temp_dir = Path.home() / ".local" / "stl_listing_tools" / "tmp"
+        
         # Ensure the temp directory exists
         temp_dir.mkdir(parents=True, exist_ok=True)
         
