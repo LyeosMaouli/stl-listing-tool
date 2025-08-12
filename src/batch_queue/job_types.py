@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple, Any, Union
 import json
 
 try:
-    from ..rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
+    from rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
     RENDERING_AVAILABLE = True
 except ImportError:
     # Create fallback enums if rendering module is not available

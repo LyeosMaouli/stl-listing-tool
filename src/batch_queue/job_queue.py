@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Callable, Iterator
 import uuid
 from pathlib import Path
 
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 from .job_types import QueueJob, JobState, JobType
 
 logger = setup_logger("queue.job_queue")

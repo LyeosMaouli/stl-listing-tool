@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Callable, Any
 from collections import deque
 from statistics import mean
 
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 from .job_types import QueueJob, JobState
 
 logger = setup_logger("queue.progress_tracker")

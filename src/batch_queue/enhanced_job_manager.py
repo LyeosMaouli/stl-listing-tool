@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any, Set
 from concurrent.futures import Future
 
-from ..utils.logger import setup_logger
+from utils.logger import setup_logger
 from .job_types_v2 import Job, JobStatus, JobResult, JobError
 from .job_executor import JobExecutionEngine
 from .job_handlers import RenderJobHandler, ValidationJobHandler, AnalysisJobHandler
