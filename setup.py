@@ -66,7 +66,7 @@ setup(
             "mypy>=1.5.0",
         ],
         "gui": [
-            "tkinterdnd2>=0.3.0",  # Drag and drop support for GUI
+            # No additional GUI dependencies needed
         ],
         "blender": [
             "bpy>=3.6.0",  # Blender Python API (when available)
@@ -77,9 +77,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "stl-processor=cli:cli",
-            "stl-proc=cli:cli",  # Shorter alias
-            "stl-gui=gui:main",  # GUI launcher
+            "stl-processor=stl_processor.cli:cli",
+            "stl-proc=stl_processor.cli:cli",  # Shorter alias
+            "stl-gui=stl_processor.gui_batch:main",  # Main GUI (supports both single and batch)
         ],
     },
     include_package_data=True,

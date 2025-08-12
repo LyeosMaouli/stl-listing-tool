@@ -13,7 +13,7 @@ pip install -e .
 # Use CLI commands
 stl-processor analyze model.stl
 stl-processor render model.stl output.png
-stl-gui  # Launch GUI
+stl-gui  # Launch GUI (supports single and batch processing)
 
 # Or install dependencies only
 pip install -r requirements.txt
@@ -45,7 +45,7 @@ pip install -r requirements.txt
 - **Advanced STL Analysis**: Dimensional analysis, mesh validation, printability assessment
 - **Professional Rendering**: Multiple material types, lighting presets, high-quality output
 - **Batch Processing**: Automated workflows for multiple files
-- **GUI Interface**: User-friendly drag-and-drop interface
+- **GUI Interface**: User-friendly interface with browse buttons for file selection
 - **CLI Tools**: Command-line interface for scripting and automation
 - **Export Options**: Multiple output formats and scales
 
