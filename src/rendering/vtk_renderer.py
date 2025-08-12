@@ -40,11 +40,8 @@ class VTKRenderer(BaseRenderer):
             # Create renderer
             self.renderer = vtk.vtkRenderer()
             
-            # Set background - use transparent if background image is set
-            if self.has_background_image():
-                self.renderer.SetBackground(0.0, 0.0, 0.0)  # Black background for compositing
-            else:
-                self.renderer.SetBackground(*self.background_color[:3])
+            # Always set normal background - we'll handle compositing in post-processing
+            self.renderer.SetBackground(*self.background_color[:3])
             
             # Create render window
             self.render_window = vtk.vtkRenderWindow()
@@ -468,22 +465,63 @@ class VTKRenderer(BaseRenderer):
         self.renderer.SetAmbient(ambient, ambient, ambient)
     
     def _render_with_background(self, output_path: Path) -> bool:
-        """Render with background image compositing."""
+        """Render with background image compositing using color-key masking."""
         try:
             if not PIL_AVAILABLE:
                 logger.error("PIL/Pillow is required for background image support")
                 return False
             
-            logger.info("Rendering with background image compositing")
+            logger.info("Rendering with background image compositing using masking")
             
-            # Render STL to numpy array
-            rendered_array = self.render_to_array()
-            if rendered_array is None:
-                logger.error("Failed to render STL to array")
-                return False
+            # Temporarily change background to a distinctive color for masking
+            original_bg = self.background_color
+            mask_color = (0.0, 1.0, 0.0)  # Bright green for masking
+            self.renderer.SetBackground(*mask_color)
             
-            # Composite with background
-            composited_array = self.composite_with_background(rendered_array)
+            try:
+                # Render STL with mask color background
+                rendered_array = self.render_to_array()
+                if rendered_array is None:
+                    logger.error("Failed to render STL to array")
+                    return False
+                
+                logger.info(f"Rendered array shape: {rendered_array.shape}, dtype: {rendered_array.dtype}")
+                
+                # Create mask based on the green background
+                # Convert to numpy array if needed
+                if rendered_array.ndim == 3 and rendered_array.shape[2] >= 3:
+                    # Create mask where pixels are close to the green background
+                    green_mask = (
+                        (rendered_array[:, :, 0] < 50) &  # Low red
+                        (rendered_array[:, :, 1] > 200) &  # High green
+                        (rendered_array[:, :, 2] < 50)     # Low blue
+                    )
+                    
+                    logger.info(f"Created mask with {np.sum(green_mask)} green pixels out of {green_mask.size}")
+                    
+                    # Get background image resized to match render size
+                    if self.background_image is not None:
+                        background = self.background_image.copy()
+                        if background.shape[:2] != rendered_array.shape[:2]:
+                            bg_img = Image.fromarray(background)
+                            bg_img = bg_img.resize((rendered_array.shape[1], rendered_array.shape[0]), Image.Resampling.LANCZOS)
+                            background = np.array(bg_img)
+                        
+                        # Apply mask - replace green pixels with background
+                        composited_array = rendered_array.copy()
+                        composited_array[green_mask] = background[green_mask]
+                        
+                        logger.info("Successfully applied background mask")
+                    else:
+                        logger.error("Background image not available")
+                        return False
+                else:
+                    logger.error(f"Unexpected rendered array shape: {rendered_array.shape}")
+                    return False
+                
+            finally:
+                # Restore original background color
+                self.renderer.SetBackground(*original_bg[:3])
             
             # Save the composited image
             img = Image.fromarray(composited_array, 'RGB')
