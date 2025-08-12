@@ -3,6 +3,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Union, Any
 import numpy as np
 from enum import Enum
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 from utils.logger import logger
 
@@ -48,6 +53,8 @@ class BaseRenderer(ABC):
         
         # Default settings
         self.background_color = (1.0, 1.0, 1.0, 1.0)  # White
+        self.background_image_path: Optional[Path] = None
+        self.background_image: Optional[np.ndarray] = None
         self.material_type = MaterialType.PLASTIC
         self.lighting_preset = LightingPreset.STUDIO
         self.render_quality = RenderQuality.STANDARD
@@ -157,7 +164,104 @@ class BaseRenderer(ABC):
             color: Background color (r, g, b, a)
         """
         self.background_color = color
+        # Clear background image when setting color
+        self.background_image_path = None
+        self.background_image = None
         logger.debug(f"Set background color to {color}")
+    
+    def set_background_image(self, image_path: Path) -> bool:
+        """
+        Set background image from file.
+        
+        Args:
+            image_path: Path to background image file
+            
+        Returns:
+            bool: True if image loaded successfully
+        """
+        if not PIL_AVAILABLE:
+            logger.error("PIL/Pillow is required for background image support. Install with: pip install Pillow")
+            return False
+        
+        if not image_path.exists():
+            logger.error(f"Background image not found: {image_path}")
+            return False
+        
+        try:
+            logger.info(f"Loading background image: {image_path}")
+            
+            # Load and resize image to match render size
+            with Image.open(image_path) as img:
+                # Convert to RGB if necessary
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Resize to match render dimensions
+                img_resized = img.resize((self.width, self.height), Image.Resampling.LANCZOS)
+                
+                # Convert to numpy array
+                self.background_image = np.array(img_resized, dtype=np.uint8)
+                self.background_image_path = image_path
+                
+                logger.info(f"Background image loaded successfully: {self.background_image.shape}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to load background image: {e}")
+            return False
+    
+    def has_background_image(self) -> bool:
+        """Check if a background image is set."""
+        return self.background_image is not None
+    
+    def composite_with_background(self, rendered_image: np.ndarray) -> np.ndarray:
+        """
+        Composite rendered image with background image.
+        
+        Args:
+            rendered_image: Rendered image array (with or without alpha channel)
+            
+        Returns:
+            Composited image array
+        """
+        if not self.has_background_image():
+            return rendered_image
+        
+        try:
+            # Ensure both images have the same dimensions
+            if rendered_image.shape[:2] != self.background_image.shape[:2]:
+                logger.warning(f"Image size mismatch: rendered {rendered_image.shape[:2]} vs background {self.background_image.shape[:2]}")
+                # Resize background to match rendered image
+                bg_resized = Image.fromarray(self.background_image).resize(
+                    (rendered_image.shape[1], rendered_image.shape[0]), 
+                    Image.Resampling.LANCZOS
+                )
+                background = np.array(bg_resized, dtype=np.uint8)
+            else:
+                background = self.background_image.copy()
+            
+            # Handle different channel configurations
+            if rendered_image.shape[2] == 4:  # RGBA
+                # Extract alpha channel
+                alpha = rendered_image[:, :, 3:4] / 255.0
+                rgb = rendered_image[:, :, :3]
+                
+                # Alpha composite: result = foreground * alpha + background * (1 - alpha)
+                composited = (rgb * alpha + background * (1 - alpha)).astype(np.uint8)
+                
+            elif rendered_image.shape[2] == 3:  # RGB - assume no transparency
+                composited = rendered_image
+            
+            else:
+                logger.error(f"Unsupported image format: {rendered_image.shape}")
+                return rendered_image
+            
+            logger.debug("Successfully composited image with background")
+            return composited
+            
+        except Exception as e:
+            logger.error(f"Failed to composite with background: {e}")
+            return rendered_image
     
     def set_render_quality(self, quality: RenderQuality):
         """
