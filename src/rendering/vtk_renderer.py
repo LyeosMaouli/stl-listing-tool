@@ -3,6 +3,12 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional
 
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
 from utils.logger import logger
 
@@ -33,7 +39,12 @@ class VTKRenderer(BaseRenderer):
             
             # Create renderer
             self.renderer = vtk.vtkRenderer()
-            self.renderer.SetBackground(*self.background_color[:3])
+            
+            # Set background - use transparent if background image is set
+            if self.has_background_image():
+                self.renderer.SetBackground(0.0, 0.0, 0.0)  # Black background for compositing
+            else:
+                self.renderer.SetBackground(*self.background_color[:3])
             
             # Create render window
             self.render_window = vtk.vtkRenderWindow()
@@ -237,6 +248,11 @@ class VTKRenderer(BaseRenderer):
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # If background image is set, render with compositing
+            if self.has_background_image():
+                return self._render_with_background(output_path)
+            
+            # Standard rendering without background image
             # Ensure render window size is set correctly before rendering
             self.render_window.SetSize(self.width, self.height)
             logger.debug(f"Set render window size to: {self.width} x {self.height}")
@@ -450,6 +466,44 @@ class VTKRenderer(BaseRenderer):
         # High ambient
         ambient = config['ambient']
         self.renderer.SetAmbient(ambient, ambient, ambient)
+    
+    def _render_with_background(self, output_path: Path) -> bool:
+        """Render with background image compositing."""
+        try:
+            if not PIL_AVAILABLE:
+                logger.error("PIL/Pillow is required for background image support")
+                return False
+            
+            logger.info("Rendering with background image compositing")
+            
+            # Render STL to numpy array
+            rendered_array = self.render_to_array()
+            if rendered_array is None:
+                logger.error("Failed to render STL to array")
+                return False
+            
+            # Composite with background
+            composited_array = self.composite_with_background(rendered_array)
+            
+            # Save the composited image
+            img = Image.fromarray(composited_array, 'RGB')
+            
+            # Handle different output formats
+            if output_path.suffix.lower() in ['.jpg', '.jpeg']:
+                img.save(output_path, 'JPEG', quality=95)
+            elif output_path.suffix.lower() == '.png':
+                img.save(output_path, 'PNG')
+            else:
+                # Default to PNG
+                output_path = output_path.with_suffix('.png')
+                img.save(output_path, 'PNG')
+            
+            logger.info(f"Background composited image saved to: {output_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to render with background: {e}")
+            return False
     
     def cleanup(self):
         """Cleanup VTK resources."""

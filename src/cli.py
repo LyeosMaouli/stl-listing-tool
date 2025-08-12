@@ -134,8 +134,10 @@ def validate(stl_file: Path, level: str, repair: bool):
 @click.option('--lighting', '-l', type=click.Choice(['studio', 'natural', 'dramatic', 'soft']),
               default='studio', help='Lighting preset')
 @click.option('--color', '-c', default='0.8,0.8,0.8', help='Material color (R,G,B values 0-1)')
+@click.option('--background', '-bg', type=click.Path(exists=True, path_type=Path), 
+              help='Background image file (PNG, JPG, etc.)')
 def render(stl_file: Path, output_image: Path, width: int, height: int, 
-           material: str, lighting: str, color: str):
+           material: str, lighting: str, color: str, background: Optional[Path]):
     """Render an STL file to an image."""
     try:
         logger.info(f"Rendering STL file: {stl_file}")
@@ -152,6 +154,13 @@ def render(stl_file: Path, output_image: Path, width: int, height: int,
         # Create renderer
         renderer = VTKRenderer(width, height)
         
+        # Set background image if provided
+        if background:
+            if not renderer.set_background_image(background):
+                click.echo(f"Error: Failed to load background image: {background}", err=True)
+                return
+            click.echo(f"✓ Background image loaded: {background}")
+        
         # Setup scene
         if not renderer.setup_scene(stl_file):
             click.echo("Error: Failed to setup rendering scene", err=True)
@@ -167,7 +176,10 @@ def render(stl_file: Path, output_image: Path, width: int, height: int,
         
         # Render
         if renderer.render(output_image):
-            click.echo(f"✓ Rendered successfully to: {output_image}")
+            if background:
+                click.echo(f"✓ Rendered with background successfully to: {output_image}")
+            else:
+                click.echo(f"✓ Rendered successfully to: {output_image}")
         else:
             click.echo("✗ Render failed", err=True)
             
