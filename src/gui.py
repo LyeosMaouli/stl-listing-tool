@@ -31,7 +31,86 @@ from utils.logger import setup_logger
 from error_dialog import show_comprehensive_error
 from user_config import get_user_config
 
+# Import generators with fallback
+try:
+    from generators.video_generator import RotationVideoGenerator, VideoFormat, VideoQuality
+    from generators.image_generator import ColorVariationGenerator, GridLayout
+    GENERATORS_AVAILABLE = True
+    GENERATORS_IMPORT_ERROR = None
+except ImportError as e:
+    GENERATORS_AVAILABLE = False
+    GENERATORS_IMPORT_ERROR = e
+
 logger = setup_logger("stl_processor_gui")
+
+
+class ColorVariationDialog:
+    """Dialog for selecting color variations for grid generation."""
+    
+    def __init__(self, parent):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Color Variations")
+        self.dialog.geometry("400x300")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center dialog on parent
+        self.dialog.geometry("+%d+%d" % (
+            parent.winfo_rootx() + 50,
+            parent.winfo_rooty() + 50
+        ))
+        
+        self.create_widgets()
+        self.dialog.wait_window()
+    
+    def create_widgets(self):
+        main_frame = ttk.Frame(self.dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text="Select Color Variations:", font=("TkDefaultFont", 12, "bold")).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Predefined color variations
+        self.color_vars = []
+        colors = [
+            {"name": "White Plastic", "material": "plastic", "color": (0.9, 0.9, 0.9)},
+            {"name": "Black Plastic", "material": "plastic", "color": (0.1, 0.1, 0.1)},
+            {"name": "Red Plastic", "material": "plastic", "color": (0.8, 0.2, 0.2)},
+            {"name": "Blue Plastic", "material": "plastic", "color": (0.2, 0.4, 0.8)},
+            {"name": "Green Plastic", "material": "plastic", "color": (0.2, 0.7, 0.3)},
+            {"name": "Silver Metal", "material": "metal", "color": (0.8, 0.8, 0.9)},
+            {"name": "Gold Metal", "material": "metal", "color": (0.9, 0.8, 0.4)},
+            {"name": "Clear Resin", "material": "resin", "color": (0.9, 0.9, 1.0)}
+        ]
+        
+        for color_info in colors:
+            var = tk.BooleanVar()
+            self.color_vars.append((var, color_info))
+            ttk.Checkbutton(main_frame, text=color_info["name"], variable=var).pack(anchor=tk.W, pady=2)
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(10, 0))
+        ttk.Button(button_frame, text="Generate", command=self.accept).pack(side=tk.RIGHT)
+    
+    def accept(self):
+        selected_colors = []
+        for var, color_info in self.color_vars:
+            if var.get():
+                selected_colors.append(color_info)
+        
+        if not selected_colors:
+            messagebox.showwarning("Warning", "Please select at least one color variation.")
+            return
+        
+        self.result = selected_colors
+        self.dialog.destroy()
+    
+    def cancel(self):
+        self.dialog.destroy()
+
 
 def show_error_with_logging(parent, title, message, exception=None, context=None):
     """Wrapper for show_comprehensive_error that adds debugging logs and fixes image path bugs."""
@@ -143,6 +222,23 @@ class STLProcessorGUI:
             saved_geometry = self.user_config.get('window_geometry')
             if saved_geometry:
                 self.root.geometry(saved_geometry)
+            
+            # Load generator settings
+            if hasattr(self, 'video_format_var'):
+                saved_video_format = self.user_config.get('video_format', 'mp4')
+                self.video_format_var.set(saved_video_format)
+            
+            if hasattr(self, 'video_quality_var'):
+                saved_video_quality = self.user_config.get('video_quality', 'standard')
+                self.video_quality_var.set(saved_video_quality)
+            
+            if hasattr(self, 'video_duration_var'):
+                saved_video_duration = self.user_config.get('video_duration', '8')
+                self.video_duration_var.set(str(saved_video_duration))
+            
+            if hasattr(self, 'grid_layout_var'):
+                saved_grid_layout = self.user_config.get('grid_layout', 'auto')
+                self.grid_layout_var.set(saved_grid_layout)
             
             logger.info("User settings loaded successfully")
             
@@ -276,6 +372,7 @@ class STLProcessorGUI:
         self.create_analysis_tab()
         self.create_validation_tab()
         self.create_rendering_tab()
+        self.create_generators_tab()
         
     def create_analysis_tab(self):
         self.analysis_frame = ttk.Frame(self.notebook)
@@ -1017,7 +1114,276 @@ class STLProcessorGUI:
                         "operation": "image save"
                     }
                 )
+    
+    def create_generators_tab(self):
+        """Create the generators tab for video and image generation."""
+        self.generators_frame = ttk.Frame(self.notebook)
+        self.notebook.add(self.generators_frame, text="Generators")
+        
+        self.generators_frame.columnconfigure(0, weight=1)
+        self.generators_frame.rowconfigure(2, weight=1)
+        
+        # Video Generation Section
+        video_frame = ttk.LabelFrame(self.generators_frame, text="Video Generation", padding="10")
+        video_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        video_frame.columnconfigure(1, weight=1)
+        
+        # Video settings
+        ttk.Label(video_frame, text="Format:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        self.video_format_var = tk.StringVar(value="mp4")
+        video_format_combo = ttk.Combobox(video_frame, textvariable=self.video_format_var,
+                                         values=["mp4", "avi", "mov", "gif"], state="readonly")
+        video_format_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
+        
+        ttk.Label(video_frame, text="Quality:").grid(row=0, column=2, sticky=tk.W, padx=(0, 10))
+        self.video_quality_var = tk.StringVar(value="standard")
+        quality_combo = ttk.Combobox(video_frame, textvariable=self.video_quality_var,
+                                    values=["draft", "standard", "high", "ultra"], state="readonly")
+        quality_combo.grid(row=0, column=3, sticky=tk.W)
+        
+        ttk.Label(video_frame, text="Duration (sec):").grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=(10, 0))
+        self.video_duration_var = tk.StringVar(value="8")
+        duration_entry = ttk.Entry(video_frame, textvariable=self.video_duration_var, width=8)
+        duration_entry.grid(row=1, column=1, sticky=tk.W, pady=(10, 0))
+        
+        # Video generation buttons
+        video_buttons_frame = ttk.Frame(video_frame)
+        video_buttons_frame.grid(row=2, column=0, columnspan=4, pady=(15, 0))
+        
+        ttk.Button(video_buttons_frame, text="Generate 360° Video",
+                  command=self.generate_rotation_video).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(video_buttons_frame, text="Multi-Angle Video",
+                  command=self.generate_multi_angle_video).pack(side=tk.LEFT)
+        
+        # Image Generation Section
+        image_frame = ttk.LabelFrame(self.generators_frame, text="Image Generation", padding="10")
+        image_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        image_frame.columnconfigure(1, weight=1)
+        
+        # Color variation settings
+        ttk.Label(image_frame, text="Grid Layout:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        self.grid_layout_var = tk.StringVar(value="auto")
+        layout_combo = ttk.Combobox(image_frame, textvariable=self.grid_layout_var,
+                                   values=["auto", "square", "horizontal", "vertical"], state="readonly")
+        layout_combo.grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
+        
+        # Image generation buttons
+        image_buttons_frame = ttk.Frame(image_frame)
+        image_buttons_frame.grid(row=1, column=0, columnspan=4, pady=(15, 0))
+        
+        ttk.Button(image_buttons_frame, text="Color Variations Grid",
+                  command=self.generate_color_grid).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(image_buttons_frame, text="Size Chart",
+                  command=self.generate_size_chart).pack(side=tk.LEFT)
+        
+        # Progress section for generators
+        progress_frame = ttk.LabelFrame(self.generators_frame, text="Generation Progress", padding="10")
+        progress_frame.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        progress_frame.columnconfigure(0, weight=1)
+        progress_frame.rowconfigure(1, weight=1)
+        
+        self.generator_progress_var = tk.DoubleVar()
+        self.generator_progress_bar = ttk.Progressbar(progress_frame, variable=self.generator_progress_var,
+                                                     maximum=100, mode='determinate')
+        self.generator_progress_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        
+        self.generator_log = scrolledtext.ScrolledText(progress_frame, height=8, state=tk.DISABLED)
+        self.generator_log.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Connect settings change handlers
+        self.video_format_var.trace('w', lambda *args: self.save_setting('video_format', self.video_format_var.get()))
+        self.video_quality_var.trace('w', lambda *args: self.save_setting('video_quality', self.video_quality_var.get()))
+        self.video_duration_var.trace('w', lambda *args: self.save_setting('video_duration', self.video_duration_var.get()))
+        self.grid_layout_var.trace('w', lambda *args: self.save_setting('grid_layout', self.grid_layout_var.get()))
+    
+    def generate_rotation_video(self):
+        """Generate a 360° rotation video of the current model."""
+        if not self.current_file or not self.processor:
+            messagebox.showwarning("Warning", "Please select an STL file first")
+            return
+        
+        if not GENERATORS_AVAILABLE:
+            show_error_with_logging(
+                self.root,
+                "Missing Dependencies",
+                "Video generation dependencies are not installed. Please run 'pip install moviepy' to enable video generation.",
+                exception=GENERATORS_IMPORT_ERROR,
+                context={"missing_modules": "video generation modules"}
+            )
+            return
+        
+        # Get save location
+        file_path = filedialog.asksaveasfilename(
+            title="Save Rotation Video",
+            defaultextension=f".{self.video_format_var.get()}",
+            filetypes=[
+                ("MP4 files", "*.mp4"),
+                ("AVI files", "*.avi"), 
+                ("MOV files", "*.mov"),
+                ("GIF files", "*.gif"),
+                ("All files", "*.*")
+            ]
+        )
+        
+        if not file_path:
+            return
+        
+        def run_generation():
+            try:
+                # Clear log
+                self.generator_log.config(state=tk.NORMAL)
+                self.generator_log.delete(1.0, tk.END)
+                self.generator_log.config(state=tk.DISABLED)
                 
+                self.log_generator_message("Starting video generation...")
+                
+                # Create video generator
+                generator = RotationVideoGenerator()
+                generator.set_progress_callback(self.update_generator_progress)
+                
+                # Get settings
+                video_format = VideoFormat(self.video_format_var.get())
+                video_quality = VideoQuality(self.video_quality_var.get())
+                duration = float(self.video_duration_var.get())
+                
+                # Create renderer for video generation
+                if not RENDERING_MODULES_AVAILABLE:
+                    raise Exception("Rendering modules not available")
+                
+                from rendering.vtk_renderer import VTKRenderer
+                width = int(self.width_var.get())
+                height = int(self.height_var.get())
+                renderer = VTKRenderer(width, height)
+                
+                if not renderer.initialize():
+                    raise Exception("Failed to initialize renderer")
+                
+                if not renderer.setup_scene(self.current_file):
+                    raise Exception("Failed to setup scene")
+                
+                # Apply current material and lighting settings
+                from rendering.base_renderer import MaterialType, LightingPreset
+                material_type = MaterialType(self.material_var.get())
+                renderer.set_material(material_type, (0.8, 0.8, 0.8))
+                
+                lighting_preset = LightingPreset(self.lighting_var.get())
+                renderer.set_lighting(lighting_preset)
+                
+                # Generate video
+                success = generator.generate_rotation_video(
+                    renderer, Path(file_path), video_format, video_quality, duration
+                )
+                
+                if success:
+                    self.log_generator_message(f"✓ Video saved successfully: {file_path}")
+                    messagebox.showinfo("Success", f"Video generated successfully!\nSaved to: {file_path}")
+                else:
+                    self.log_generator_message("✗ Video generation failed")
+                    
+            except Exception as e:
+                logger.error(f"Video generation error: {e}")
+                self.log_generator_message(f"✗ Error: {str(e)}")
+                show_error_with_logging(
+                    self.root,
+                    "Video Generation Failed",
+                    f"Failed to generate rotation video: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "rotation video generation",
+                        "video_format": self.video_format_var.get(),
+                        "video_quality": self.video_quality_var.get()
+                    }
+                )
+            finally:
+                self.generator_progress_var.set(0)
+        
+        # Run in separate thread
+        threading.Thread(target=run_generation, daemon=True).start()
+    
+    def generate_multi_angle_video(self):
+        """Generate a multi-angle video showing different views."""
+        messagebox.showinfo("Coming Soon", "Multi-angle video generation will be available in a future update.")
+    
+    def generate_color_grid(self):
+        """Generate a color variation grid image."""
+        if not self.current_file or not self.processor:
+            messagebox.showwarning("Warning", "Please select an STL file first")
+            return
+        
+        # Show color selection dialog
+        colors_dialog = ColorVariationDialog(self.root)
+        if colors_dialog.result:
+            color_variations = colors_dialog.result
+            
+            # Get save location
+            file_path = filedialog.asksaveasfilename(
+                title="Save Color Grid",
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("All files", "*.*")]
+            )
+            
+            if file_path:
+                self._generate_color_grid_async(color_variations, file_path)
+    
+    def generate_size_chart(self):
+        """Generate a size comparison chart."""
+        messagebox.showinfo("Coming Soon", "Size chart generation will be available in a future update.")
+    
+    def _generate_color_grid_async(self, color_variations, output_path):
+        """Generate color grid in background thread."""
+        def run_generation():
+            try:
+                self.log_generator_message("Starting color grid generation...")
+                
+                generator = ColorVariationGenerator()
+                generator.set_progress_callback(self.update_generator_progress)
+                
+                # Create renderer
+                if not RENDERING_MODULES_AVAILABLE:
+                    raise Exception("Rendering modules not available")
+                
+                from rendering.vtk_renderer import VTKRenderer
+                renderer = VTKRenderer(300, 300)
+                
+                if not renderer.initialize():
+                    raise Exception("Failed to initialize renderer")
+                
+                if not renderer.setup_scene(self.current_file):
+                    raise Exception("Failed to setup scene")
+                
+                # Generate grid
+                grid_layout = GridLayout(self.grid_layout_var.get())
+                success = generator.generate_color_grid(
+                    renderer, Path(output_path), color_variations, grid_layout
+                )
+                
+                if success:
+                    self.log_generator_message(f"✓ Color grid saved: {output_path}")
+                    messagebox.showinfo("Success", f"Color grid generated!\nSaved to: {output_path}")
+                else:
+                    self.log_generator_message("✗ Color grid generation failed")
+                    
+            except Exception as e:
+                logger.error(f"Color grid generation error: {e}")
+                self.log_generator_message(f"✗ Error: {str(e)}")
+            finally:
+                self.generator_progress_var.set(0)
+        
+        threading.Thread(target=run_generation, daemon=True).start()
+    
+    def update_generator_progress(self, progress: float, message: str):
+        """Update generator progress bar and log."""
+        self.generator_progress_var.set(progress)
+        self.log_generator_message(f"{progress:.1f}% - {message}")
+    
+    def log_generator_message(self, message: str):
+        """Add a message to the generator log."""
+        self.generator_log.config(state=tk.NORMAL)
+        self.generator_log.insert(tk.END, f"{message}\n")
+        self.generator_log.see(tk.END)
+        self.generator_log.config(state=tk.DISABLED)
+        
     def show_about(self):
         about_text = """STL Listing Tool v1.0
 
