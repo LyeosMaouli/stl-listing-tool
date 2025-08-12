@@ -270,10 +270,10 @@ class STLProcessorGUI:
                                    foreground="gray")
         bg_status_label.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Background preview (small thumbnail)
-        self.bg_preview = tk.Label(bg_frame, text="", bg="lightgray", width=8, height=4,
-                                  relief="sunken", bd=1)
-        self.bg_preview.pack(side=tk.LEFT)
+        # Background preview (larger thumbnail)
+        self.bg_preview = tk.Label(bg_frame, text="No preview", bg="lightgray", width=20, height=6,
+                                  relief="sunken", bd=2)
+        self.bg_preview.pack(side=tk.LEFT, padx=(10, 0))
         
         render_button_frame = ttk.Frame(self.rendering_frame)
         render_button_frame.grid(row=1, column=0, columnspan=2, pady=10)
@@ -626,10 +626,10 @@ class STLProcessorGUI:
         try:
             from PIL import Image, ImageTk
             
-            # Load and create small thumbnail
+            # Load and create larger thumbnail
             with Image.open(self.background_path) as img:
-                # Create thumbnail (64x48 pixels to fit in the preview widget)
-                img.thumbnail((64, 48), Image.Resampling.LANCZOS)
+                # Create thumbnail (160x120 pixels for better visibility)
+                img.thumbnail((160, 120), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 
                 # Update preview widget
