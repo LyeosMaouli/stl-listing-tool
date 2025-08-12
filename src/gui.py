@@ -81,8 +81,8 @@ class STLProcessorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("STL Listing Tool")
-        self.root.geometry("1200x800")
-        self.root.minsize(800, 600)
+        self.root.geometry("1400x900")
+        self.root.minsize(1000, 700)
         
         self.current_file = None
         self.processor = None
@@ -222,7 +222,7 @@ class STLProcessorGUI:
         self.notebook.add(self.rendering_frame, text="Rendering")
         
         self.rendering_frame.columnconfigure(1, weight=1)
-        self.rendering_frame.rowconfigure(3, weight=1)
+        self.rendering_frame.rowconfigure(2, weight=1)  # Make the render_display row expandable
         
         settings_frame = ttk.LabelFrame(self.rendering_frame, text="Render Settings", padding="10")
         settings_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -262,7 +262,7 @@ class STLProcessorGUI:
                   command=self.save_render).pack(side=tk.LEFT)
         
         self.render_display = tk.Label(self.rendering_frame, text="Rendered image will appear here",
-                                      bg="white", relief="sunken", width=60, height=20)
+                                      bg="white", relief="sunken", width=80, height=40)
         self.render_display.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
         
         progress_frame = ttk.Frame(self.rendering_frame)
