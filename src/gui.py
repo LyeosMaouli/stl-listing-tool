@@ -270,9 +270,9 @@ class STLProcessorGUI:
                                    foreground="gray")
         bg_status_label.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Background preview (larger thumbnail)
-        self.bg_preview = tk.Label(bg_frame, text="No preview", bg="lightgray", width=20, height=6,
-                                  relief="sunken", bd=2)
+        # Background preview (larger thumbnail) - no fixed size, let image determine size
+        self.bg_preview = tk.Label(bg_frame, text="No preview", bg="lightgray", 
+                                  relief="sunken", bd=2, compound="center")
         self.bg_preview.pack(side=tk.LEFT, padx=(10, 0))
         
         render_button_frame = ttk.Frame(self.rendering_frame)
@@ -613,8 +613,8 @@ class STLProcessorGUI:
         self.status_var.set("Background image cleared")
         logger.info("Background image cleared")
         
-        # Clear preview
-        self.bg_preview.config(image="", text="")
+        # Clear preview and restore default size
+        self.bg_preview.config(image="", text="No preview", width=0, height=0)
         if hasattr(self.bg_preview, 'image'):
             delattr(self.bg_preview, 'image')
     
@@ -632,16 +632,16 @@ class STLProcessorGUI:
                 img.thumbnail((160, 120), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 
-                # Update preview widget
-                self.bg_preview.config(image=photo, text="")
+                # Update preview widget - clear width/height to let image determine size
+                self.bg_preview.config(image=photo, text="", width=0, height=0)
                 self.bg_preview.image = photo  # Keep reference to prevent garbage collection
                 
         except ImportError:
             # PIL not available, show text instead
-            self.bg_preview.config(text="IMG", image="")
+            self.bg_preview.config(text="IMG", image="", width=10, height=3)
         except Exception as e:
             logger.warning(f"Failed to create background preview: {e}")
-            self.bg_preview.config(text="ERR", image="")
+            self.bg_preview.config(text="ERR", image="", width=10, height=3)
         
     def display_validation_results(self, results):
         output = []
