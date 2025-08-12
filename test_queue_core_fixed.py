@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick test of core queue components to verify implementation works.
+Fixed test of core queue components that handles dependencies properly.
 """
 
 import sys
@@ -10,11 +10,22 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from queue import (
-    JobType, JobState, RenderOptions, ValidationOptions,
-    QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
-)
-from rendering.base_renderer import MaterialType, LightingPreset
+try:
+    # Try to import with rendering dependencies
+    from queue import (
+        JobType, JobState, RenderOptions, ValidationOptions,
+        QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
+    )
+    from rendering.base_renderer import MaterialType, LightingPreset
+    RENDERING_AVAILABLE = True
+except ImportError:
+    # Import without rendering dependencies (uses fallback enums)
+    from queue import (
+        JobType, JobState, RenderOptions, ValidationOptions,
+        QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
+    )
+    from queue.job_types import MaterialType, LightingPreset
+    RENDERING_AVAILABLE = False
 
 
 def create_test_stl_file():
@@ -218,17 +229,21 @@ def test_progress_tracker():
 
 def main():
     """Run all tests."""
-    print("Testing STL Queue Core Components")
-    print("=" * 40)
+    print("Testing STL Queue Core Components (Fixed Version)")
+    print("=" * 50)
+    
+    if not RENDERING_AVAILABLE:
+        print("Note: Using fallback enums (rendering dependencies not available)")
     
     try:
         test_job_creation()
-        test_job_queue()
+        test_job_queue() 
         test_file_scanner()
         test_progress_tracker()
         
-        print("\n" + "=" * 40)
-        print("✓ All tests passed!")
+        print("\n" + "=" * 50)
+        print("✓ All core tests passed!")
+        print(f"Rendering dependencies: {'✓ Available' if RENDERING_AVAILABLE else '✗ Using fallbacks'}")
         
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
