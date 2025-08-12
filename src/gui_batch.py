@@ -12,17 +12,10 @@ from typing import Optional, Dict, Any, List
 import os
 
 # Import existing GUI base
-try:
-    from .gui import STLProcessorGUI, show_error_with_logging, CORE_MODULES_AVAILABLE, RENDERING_MODULES_AVAILABLE
-    from .batch_queue.enhanced_job_manager import EnhancedJobManager
-    from .batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
-    from .utils.logger import setup_logger
-except ImportError:
-    # Fallback for entry point execution
-    from gui import STLProcessorGUI, show_error_with_logging, CORE_MODULES_AVAILABLE, RENDERING_MODULES_AVAILABLE
-    from batch_queue.enhanced_job_manager import EnhancedJobManager
-    from batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
-    from utils.logger import setup_logger
+from .gui import STLProcessorGUI, show_error_with_logging, CORE_MODULES_AVAILABLE, RENDERING_MODULES_AVAILABLE
+from .batch_queue.enhanced_job_manager import EnhancedJobManager
+from .batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
+from .utils.logger import setup_logger
 
 logger = setup_logger("stl_processor_batch_gui")
 

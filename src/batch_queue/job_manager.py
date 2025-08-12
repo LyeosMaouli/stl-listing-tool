@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any, Set
 import time
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 from .job_types import QueueJob, JobState, JobType, JobResults
 from .job_queue import JobQueue, create_job_from_stl
 from .progress_tracker import ProgressTracker

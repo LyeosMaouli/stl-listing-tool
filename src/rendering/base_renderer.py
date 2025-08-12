@@ -9,7 +9,7 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-from utils.logger import logger
+from ..utils.logger import logger
 
 
 class MaterialType(Enum):

@@ -9,8 +9,8 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-from utils.logger import logger
+from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
+from ..utils.logger import logger
 
 
 class VTKRenderer(BaseRenderer):
