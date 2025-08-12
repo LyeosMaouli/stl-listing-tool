@@ -4,14 +4,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from enum import Enum
 from pathlib import Path
 
-# Handle both package and direct imports
-try:
-    from ..utils.logger import logger
-except ImportError:
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from utils.logger import setup_logger
-    logger = setup_logger("mesh_validator")
+from utils.logger import logger
 
 
 class ValidationLevel(Enum):

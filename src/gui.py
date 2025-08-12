@@ -4,45 +4,85 @@ from pathlib import Path
 import threading
 import json
 from typing import Optional, Dict, Any
-import sys
 import os
+import tempfile
 
-# Ensure we can import from the src directory
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
-
-# Also add parent directory to handle package imports
-parent_dir = current_dir.parent
-if str(parent_dir) not in sys.path:
-    sys.path.insert(0, str(parent_dir))
-
+# Use absolute imports for entry point compatibility
 try:
-    # Try package-style imports first
-    from src.core.stl_processor import STLProcessor
-    from src.core.dimension_extractor import DimensionExtractor
-    from src.core.mesh_validator import MeshValidator, ValidationLevel
-    from src.rendering.vtk_renderer import VTKRenderer
-    from src.rendering.base_renderer import MaterialType, LightingPreset
-    from src.utils.logger import setup_logger
-except ImportError:
-    # Fall back to direct imports
     from core.stl_processor import STLProcessor
     from core.dimension_extractor import DimensionExtractor
     from core.mesh_validator import MeshValidator, ValidationLevel
+    CORE_MODULES_AVAILABLE = True
+    CORE_IMPORT_ERROR = None
+except ImportError as e:
+    CORE_MODULES_AVAILABLE = False
+    CORE_IMPORT_ERROR = e
+
+try:
     from rendering.vtk_renderer import VTKRenderer
     from rendering.base_renderer import MaterialType, LightingPreset
-    from utils.logger import setup_logger
+    RENDERING_MODULES_AVAILABLE = True
+    RENDERING_IMPORT_ERROR = None
+except ImportError as e:
+    RENDERING_MODULES_AVAILABLE = False
+    RENDERING_IMPORT_ERROR = e
+
+from utils.logger import setup_logger
+from error_dialog import show_comprehensive_error
 
 logger = setup_logger("stl_processor_gui")
+
+def show_error_with_logging(parent, title, message, exception=None, context=None):
+    """Wrapper for show_comprehensive_error that adds debugging logs and fixes image path bugs."""
+    logger.info(f"=== ERROR DIALOG CALLED ===")
+    logger.info(f"Title: {title}")
+    logger.info(f"Message: {message}")
+    logger.info(f"Exception: {exception}")
+    logger.info(f"Context keys: {list(context.keys()) if context else None}")
+    
+    # Fix: Check if message IS an image path and fix it
+    original_message = message
+    if str(message).strip().startswith('/tmp/images/') or (len(str(message)) < 200 and '/tmp/images/' in str(message)):
+        logger.error(f"CRITICAL BUG DETECTED: Error message is an image path! Original: {message}")
+        logger.error(f"This indicates a bug where an image path was passed as error message")
+        
+        # Generate a better error message
+        fixed_message = f"An error occurred during rendering or image processing. The system attempted to save or access an image file, but the operation failed."
+        
+        # Add the path to context instead
+        if context is None:
+            context = {}
+        context['detected_image_path'] = str(message)
+        context['error_message_fix_applied'] = 'Image path was incorrectly passed as error message'
+        
+        message = fixed_message
+        logger.info(f"Fixed error message: {message}")
+    
+    # Check if exception string contains image path
+    if exception and '/tmp/images/' in str(exception):
+        logger.error(f"CRITICAL: Exception contains image path! Exception: {exception}")
+    
+    # Check context for image paths (this is normal/expected)
+    if context:
+        for key, value in context.items():
+            if '/tmp/images/' in str(value):
+                logger.info(f"Context key '{key}' contains image path: {value} (this may be normal)")
+    
+    if original_message != message:
+        logger.info(f"Applied error message fix: '{original_message}' -> '{message}'")
+    
+    logger.info(f"=== END ERROR DIALOG INFO ===")
+    
+    # Call the actual error dialog
+    show_comprehensive_error(parent, title, message, exception, context)
 
 
 class STLProcessorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("STL Listing Tool")
-        self.root.geometry("1200x800")
-        self.root.minsize(800, 600)
+        self.root.geometry("1400x900")
+        self.root.minsize(1000, 700)
         
         self.current_file = None
         self.processor = None
@@ -50,6 +90,18 @@ class STLProcessorGUI:
         
         self.setup_ui()
         self.setup_drag_drop()
+    
+    def get_temp_render_path(self):
+        """Get a safe temporary path for rendering output."""
+        temp_dir = Path(tempfile.gettempdir())
+        # Ensure the temp directory exists
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Also ensure /tmp/images exists (for any potential screenshot functionality)
+        images_dir = temp_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        
+        return temp_dir / "stl_render.png"
         
     def setup_ui(self):
         self.create_menu()
@@ -170,7 +222,7 @@ class STLProcessorGUI:
         self.notebook.add(self.rendering_frame, text="Rendering")
         
         self.rendering_frame.columnconfigure(1, weight=1)
-        self.rendering_frame.rowconfigure(3, weight=1)
+        self.rendering_frame.rowconfigure(2, weight=1)  # Make the render_display row expandable
         
         settings_frame = ttk.LabelFrame(self.rendering_frame, text="Render Settings", padding="10")
         settings_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -210,7 +262,7 @@ class STLProcessorGUI:
                   command=self.save_render).pack(side=tk.LEFT)
         
         self.render_display = tk.Label(self.rendering_frame, text="Rendered image will appear here",
-                                      bg="white", relief="sunken", width=60, height=20)
+                                      bg="white", relief="sunken", width=80, height=40)
         self.render_display.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
         
         progress_frame = ttk.Frame(self.rendering_frame)
@@ -243,15 +295,27 @@ class STLProcessorGUI:
                 if file_path.suffix.lower() == '.stl':
                     self.load_file(file_path)
                 else:
-                    messagebox.showerror("Error", "Please select an STL file")
+                    show_error_with_logging(
+                        self.root, 
+                        "Invalid File Type", 
+                        "Please select an STL file",
+                        context={"attempted_file": str(file_path), "file_extension": file_path.suffix}
+                    )
                     
         try:
-            from tkinterdnd2 import TkinterDnD, DND_FILES
-            self.root = TkinterDnD.Tk()
+            from tkinterdnd2 import DND_FILES
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
+            self.dnd_available = True
         except ImportError:
-            pass
+            self.dnd_available = False
+            logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            # Update drop area to show drag-and-drop is unavailable
+            self.drop_area.config(
+                text="Drag-and-drop unavailable\nUse Browse button instead",
+                bg="lightyellow",
+                fg="darkgray"
+            )
             
     def browse_file(self):
         file_path = filedialog.askopenfilename(
@@ -263,16 +327,69 @@ class STLProcessorGUI:
             
     def load_file(self, file_path: Path):
         if not file_path.exists():
-            messagebox.showerror("Error", f"File not found: {file_path}")
+            show_error_with_logging(
+                self.root,
+                "File Not Found",
+                f"The selected file does not exist: {file_path}",
+                context={
+                    "file_path": str(file_path),
+                    "parent_directory": str(file_path.parent),
+                    "parent_exists": file_path.parent.exists(),
+                    "current_working_directory": str(Path.cwd())
+                }
+            )
             return
             
         self.current_file = file_path
         self.file_var.set(str(file_path))
         self.status_var.set(f"Loaded: {file_path.name}")
         
+        # Check if core modules are available before proceeding
+        if not CORE_MODULES_AVAILABLE:
+            show_error_with_logging(
+                self.root,
+                "Missing Dependencies", 
+                "STL processing dependencies are not installed. Please run 'pip install -r requirements.txt' to install required packages.",
+                exception=CORE_IMPORT_ERROR,
+                context={
+                    "file_path": str(file_path),
+                    "missing_modules": "core STL processing modules",
+                    "import_error": str(CORE_IMPORT_ERROR)
+                }
+            )
+            return
+
         self.processor = STLProcessor()
-        if not self.processor.load(file_path):
-            messagebox.showerror("Error", f"Failed to load STL file: {file_path}")
+        try:
+            if not self.processor.load(file_path):
+                # Get the actual exception if available
+                exception = self.processor.last_error
+                show_error_with_logging(
+                    self.root,
+                    "STL Loading Failed", 
+                    f"Failed to load STL file: {file_path}",
+                    exception=exception,
+                    context={
+                        "file_path": str(file_path),
+                        "file_size": file_path.stat().st_size if file_path.exists() else "Unknown",
+                        "file_extension": file_path.suffix,
+                        "processor_state": "Failed during load operation"
+                    }
+                )
+                return
+        except Exception as e:
+            show_comprehensive_error(
+                self.root,
+                "STL Loading Error",
+                f"An exception occurred while loading STL file: {file_path}",
+                exception=e,
+                context={
+                    "file_path": str(file_path),
+                    "file_size": file_path.stat().st_size if file_path.exists() else "Unknown",
+                    "file_extension": file_path.suffix,
+                    "operation": "STL file loading"
+                }
+            )
             return
             
         logger.info(f"Loaded STL file: {file_path}")
@@ -304,7 +421,18 @@ class STLProcessorGUI:
                 
             except Exception as e:
                 logger.error(f"Analysis error: {e}")
-                messagebox.showerror("Error", f"Analysis failed: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Analysis Failed",
+                    f"Analysis failed during processing: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "STL analysis",
+                        "processor_loaded": self.processor is not None,
+                        "analysis_stage": "dimension_extraction_or_analysis"
+                    }
+                )
                 self.status_var.set("Analysis failed")
             finally:
                 self.progress_var.set(0)
@@ -373,7 +501,18 @@ class STLProcessorGUI:
                         
                 messagebox.showinfo("Success", f"Analysis exported to {file_path}")
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to export: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Export Failed",
+                    f"Failed to export analysis results: {str(e)}",
+                    exception=e,
+                    context={
+                        "export_file_path": str(file_path),
+                        "export_format": path.suffix.lower(),
+                        "has_analysis_results": self.analysis_results is not None,
+                        "operation": "analysis export"
+                    }
+                )
                 
     def validate_file(self):
         if not self.current_file or not self.processor:
@@ -402,7 +541,19 @@ class STLProcessorGUI:
                 
             except Exception as e:
                 logger.error(f"Validation error: {e}")
-                messagebox.showerror("Error", f"Validation failed: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Validation Failed",
+                    f"Mesh validation failed: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "mesh validation",
+                        "validation_level": self.validation_level.get(),
+                        "auto_repair_enabled": self.repair_var.get(),
+                        "processor_loaded": self.processor is not None
+                    }
+                )
                 self.status_var.set("Validation failed")
             finally:
                 self.progress_var.set(0)
@@ -446,7 +597,22 @@ class STLProcessorGUI:
             messagebox.showwarning("Warning", "Please select an STL file first")
             return
             
+        # Check if rendering modules are available
+        if not RENDERING_MODULES_AVAILABLE:
+            show_error_with_logging(
+                self.root,
+                "Missing Rendering Dependencies", 
+                "Rendering dependencies are not installed. Please run 'pip install vtk' to enable rendering.",
+                exception=RENDERING_IMPORT_ERROR,
+                context={
+                    "missing_modules": "VTK rendering modules",
+                    "import_error": str(RENDERING_IMPORT_ERROR)
+                }
+            )
+            return
+            
         def run_render():
+            renderer = None
             try:
                 self.status_var.set("Setting up renderer...")
                 self.progress_var.set(20)
@@ -454,7 +620,26 @@ class STLProcessorGUI:
                 width = int(self.width_var.get())
                 height = int(self.height_var.get())
                 
+                logger.info(f"Creating VTK renderer with dimensions: {width}x{height}")
                 renderer = VTKRenderer(width, height)
+                
+                # Explicitly initialize the renderer first
+                logger.info("Initializing VTK renderer...")
+                if not renderer.initialize():
+                    raise Exception("Failed to initialize VTK renderer")
+                
+                # Verify the renderer window size after initialization
+                if hasattr(renderer, 'render_window') and renderer.render_window:
+                    actual_size = renderer.render_window.GetSize()
+                    logger.info(f"Renderer initialized with actual window size: {actual_size[0]}x{actual_size[1]}")
+                    
+                    # If size doesn't match, force set it again
+                    if actual_size[0] != width or actual_size[1] != height:
+                        logger.warning(f"Window size mismatch! Expected {width}x{height}, got {actual_size[0]}x{actual_size[1]}")
+                        renderer.render_window.SetSize(width, height)
+                        renderer.render_window.Modified()
+                        final_size = renderer.render_window.GetSize()
+                        logger.info(f"Forced window size to: {final_size[0]}x{final_size[1]}")
                 
                 self.progress_var.set(40)
                 self.status_var.set("Loading mesh...")
@@ -474,21 +659,50 @@ class STLProcessorGUI:
                 self.progress_var.set(80)
                 self.status_var.set("Rendering...")
                 
-                temp_path = Path("/tmp/stl_render.png")
+                temp_path = self.get_temp_render_path()
+                logger.info(f"Starting render to temp path: {temp_path}")
+                
+                # Final window size check before rendering
+                logger.critical(f"ABOUT TO CALL renderer.render() with window size: {renderer.render_window.GetSize()}")
+                if hasattr(renderer, 'render_window') and renderer.render_window:
+                    pre_render_size = renderer.render_window.GetSize()
+                    logger.info(f"Window size before render: {pre_render_size[0]}x{pre_render_size[1]}")
+                
                 if renderer.render(temp_path):
+                    logger.info(f"Render successful, displaying image from: {temp_path}")
                     self.display_rendered_image(temp_path)
                     self.progress_var.set(100)
                     self.status_var.set("Render complete")
                 else:
+                    logger.error(f"Renderer returned False for path: {temp_path}")
                     raise Exception("Render failed")
-                    
-                renderer.cleanup()
                 
             except Exception as e:
                 logger.error(f"Render error: {e}")
-                messagebox.showerror("Error", f"Rendering failed: {e}")
+                show_error_with_logging(
+                    self.root,
+                    "Rendering Failed",
+                    f"Image rendering failed: {str(e)}",
+                    exception=e,
+                    context={
+                        "file_path": str(self.current_file),
+                        "operation": "image rendering",
+                        "render_width": self.width_var.get(),
+                        "render_height": self.height_var.get(),
+                        "material_type": self.material_var.get(),
+                        "lighting_preset": self.lighting_var.get(),
+                        "processor_loaded": self.processor is not None
+                    }
+                )
                 self.status_var.set("Render failed")
             finally:
+                # Ensure proper cleanup of renderer resources
+                if renderer:
+                    try:
+                        logger.info("Cleaning up renderer resources...")
+                        renderer.cleanup()
+                    except Exception as cleanup_error:
+                        logger.warning(f"Error during renderer cleanup: {cleanup_error}")
                 self.progress_var.set(0)
                 
         threading.Thread(target=run_render, daemon=True).start()
@@ -497,17 +711,55 @@ class STLProcessorGUI:
         try:
             from PIL import Image, ImageTk
             
+            logger.info(f"Loading rendered image from: {image_path}")
             image = Image.open(image_path)
-            image.thumbnail((600, 400), Image.Resampling.LANCZOS)
+            original_size = image.size
+            logger.info(f"Original image size: {original_size[0]}x{original_size[1]}")
+            
+            # Get the actual display widget size instead of using hardcoded values
+            self.render_display.update_idletasks()  # Ensure geometry is calculated
+            
+            # Get widget dimensions (convert from characters to pixels approximately)
+            widget_width = self.render_display.winfo_width()
+            widget_height = self.render_display.winfo_height()
+            
+            # If widget hasn't been drawn yet, use reasonable defaults based on window size
+            if widget_width <= 1 or widget_height <= 1:
+                # Fallback: use a reasonable size based on the GUI layout
+                widget_width = 800  # Reasonable default width
+                widget_height = 600  # Reasonable default height
+                logger.info(f"Using fallback display size: {widget_width}x{widget_height}")
+            else:
+                logger.info(f"Display widget actual size: {widget_width}x{widget_height}")
+            
+            # Use the actual available space for thumbnailing, with some padding
+            max_width = widget_width - 20  # Leave 20px padding
+            max_height = widget_height - 20  # Leave 20px padding
+            
+            # Ensure minimum reasonable size
+            max_width = max(400, max_width)
+            max_height = max(300, max_height)
+            
+            logger.info(f"Thumbnailing to max size: {max_width}x{max_height}")
+            
+            # Create thumbnail that maintains aspect ratio
+            image.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            final_size = image.size
+            logger.info(f"Final display image size: {final_size[0]}x{final_size[1]}")
             
             photo = ImageTk.PhotoImage(image)
             self.render_display.config(image=photo, text="")
             self.render_display.image = photo
+            logger.info(f"Successfully displayed rendered image: {image_path}")
             
         except ImportError:
-            self.render_display.config(text=f"Rendered image saved to:\n{image_path}")
+            fallback_text = f"Rendered image saved to:\n{image_path}"
+            self.render_display.config(text=fallback_text)
+            logger.info(f"PIL not available, showing fallback text: {fallback_text}")
         except Exception as e:
-            self.render_display.config(text=f"Error displaying image: {e}")
+            error_text = f"Error displaying image: {e}"
+            self.render_display.config(text=error_text)
+            logger.error(f"Error displaying image {image_path}: {e}")
             
     def save_render(self):
         if not hasattr(self.render_display, 'image'):
@@ -522,13 +774,23 @@ class STLProcessorGUI:
         
         if file_path and hasattr(self.render_display, 'image'):
             try:
-                temp_path = Path("/tmp/stl_render.png")
+                temp_path = self.get_temp_render_path()
                 if temp_path.exists():
                     import shutil
                     shutil.copy(temp_path, file_path)
                     messagebox.showinfo("Success", f"Image saved to {file_path}")
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save image: {e}")
+                show_comprehensive_error(
+                    self.root,
+                    "Save Failed",
+                    f"Failed to save rendered image: {str(e)}",
+                    exception=e,
+                    context={
+                        "save_file_path": str(file_path),
+                        "temp_file_exists": self.get_temp_render_path().exists(),
+                        "operation": "image save"
+                    }
+                )
                 
     def show_about(self):
         about_text = """STL Listing Tool v1.0

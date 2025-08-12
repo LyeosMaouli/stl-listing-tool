@@ -1,11 +1,7 @@
 import click
 from pathlib import Path
-import sys
 import json
 from typing import Optional
-
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
 
 from core.stl_processor import STLProcessor
 from core.dimension_extractor import DimensionExtractor

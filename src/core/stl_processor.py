@@ -3,14 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 import numpy as np
 
-# Handle both package and direct imports
-try:
-    from ..utils.logger import logger
-except ImportError:
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from utils.logger import setup_logger
-    logger = setup_logger("stl_processor")
+from utils.logger import logger
 
 
 class STLProcessor:
@@ -21,6 +14,7 @@ class STLProcessor:
     def __init__(self):
         self.mesh: Optional[trimesh.Trimesh] = None
         self.filepath: Optional[Path] = None
+        self.last_error: Optional[Exception] = None
         
     def load(self, filepath: Union[str, Path]) -> bool:
         """
@@ -44,69 +38,69 @@ class STLProcessor:
             
             logger.info(f"Loading STL file: {filepath}")
             self.mesh = trimesh.load(str(self.filepath))
+            logger.debug(f"Loaded object type: {type(self.mesh)}")
+            logger.debug(f"Loaded object: {self.mesh}")
             
             # Ensure we have a Trimesh object
             if not isinstance(self.mesh, trimesh.Trimesh):
-                logger.error(f"Loaded object is not a valid mesh: {type(self.mesh)}")
+                error_msg = f"Loaded object is not a valid mesh: {type(self.mesh)}"
+                logger.error(error_msg)
+                self.last_error = Exception(error_msg)
                 return False
                 
-            return self.validate()
+            validation_result = self.validate()
+            if not validation_result:
+                # If validation failed but no specific error was set, create one
+                if self.last_error is None:
+                    error_msg = "Mesh validation failed - see logs for details"
+                    logger.error(error_msg)
+                    self.last_error = Exception(error_msg)
+            return validation_result
             
         except Exception as e:
             logger.error(f"Failed to load {filepath}: {e}")
             self.mesh = None
+            self.last_error = e
             return False
     
     def validate(self) -> bool:
         """
-        Validate mesh integrity and attempt repairs.
+        Perform basic validation on mesh structure only.
         
         Returns:
-            bool: True if mesh is valid or successfully repaired
+            bool: True if mesh has basic structure (vertices and faces)
         """
         if self.mesh is None:
-            logger.error("No mesh loaded for validation")
+            error_msg = "No mesh loaded for validation"
+            logger.error(error_msg)
+            self.last_error = Exception(error_msg)
             return False
             
         try:
-            logger.info("Validating mesh integrity")
+            logger.info("Performing basic mesh validation")
             
             # Check if mesh is empty
             if len(self.mesh.vertices) == 0 or len(self.mesh.faces) == 0:
-                logger.error("Mesh is empty (no vertices or faces)")
+                error_msg = "Mesh is empty (no vertices or faces)"
+                logger.error(error_msg)
+                self.last_error = Exception(error_msg)
+                return False
+            
+            # Check for minimum viable mesh
+            if len(self.mesh.vertices) < 3:
+                error_msg = "Mesh has fewer than 3 vertices"
+                logger.error(error_msg)
+                self.last_error = Exception(error_msg)
                 return False
             
             # Log mesh stats
-            logger.info(f"Mesh stats: {len(self.mesh.vertices)} vertices, {len(self.mesh.faces)} faces")
+            logger.info(f"Basic validation passed: {len(self.mesh.vertices)} vertices, {len(self.mesh.faces)} faces")
             
-            # Check and fix mesh issues
-            if not self.mesh.is_volume:
-                logger.warning("Mesh has integrity issues, attempting repairs")
-                
-                # Fix normals
-                self.mesh.fix_normals()
-                
-                # Remove duplicate faces
-                self.mesh.remove_duplicate_faces()
-                
-                # Remove degenerate faces
-                self.mesh.remove_degenerate_faces()
-                
-                # Fill holes if possible
-                if hasattr(self.mesh, 'fill_holes'):
-                    self.mesh.fill_holes()
-            
-            # Final validity check
-            is_valid = self.mesh.is_volume
-            if is_valid:
-                logger.info("Mesh validation successful")
-            else:
-                logger.warning("Mesh still has integrity issues after repair attempts")
-                
-            return is_valid
+            return True
             
         except Exception as e:
-            logger.error(f"Error during mesh validation: {e}")
+            logger.error(f"Error during basic mesh validation: {e}")
+            self.last_error = e
             return False
     
     def get_dimensions(self) -> Dict[str, Union[float, list]]:

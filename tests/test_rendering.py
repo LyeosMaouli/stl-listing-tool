@@ -5,10 +5,7 @@ import tempfile
 import trimesh
 
 # Import modules to test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from rendering.vtk_renderer import VTKRenderer
+from rendering.vtk_renderer import VTKRenderer  
 from rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
 
 
@@ -246,7 +243,8 @@ class TestRendererErrorHandling:
         """Test scene setup with invalid file."""
         renderer = VTKRenderer()
         
-        invalid_path = Path("/tmp/nonexistent_file.stl")
+        import tempfile
+        invalid_path = Path(tempfile.gettempdir()) / "nonexistent_file.stl"
         result = renderer.setup_scene(invalid_path)
         
         assert result is False

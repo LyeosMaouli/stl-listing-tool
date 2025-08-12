@@ -5,9 +5,6 @@ import tempfile
 import trimesh
 
 # Import modules to test
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from core.stl_processor import STLProcessor
 from core.dimension_extractor import DimensionExtractor
 from core.mesh_validator import MeshValidator, ValidationLevel
@@ -47,7 +44,8 @@ def sample_stl_file():
 @pytest.fixture
 def invalid_stl_file():
     """Create a path to a non-existent STL file."""
-    return Path("/tmp/nonexistent_file.stl")
+    import tempfile
+    return Path(tempfile.gettempdir()) / "nonexistent_file.stl"
 
 
 class TestSTLProcessor:

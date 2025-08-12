@@ -2,17 +2,9 @@ import vtk
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Optional
-import sys
 
-# Handle both package and direct imports
-try:
-    from .base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-    from ..utils.logger import logger
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
-    from utils.logger import setup_logger
-    logger = setup_logger("vtk_renderer")
+from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
+from utils.logger import logger
 
 
 class VTKRenderer(BaseRenderer):
@@ -37,7 +29,7 @@ class VTKRenderer(BaseRenderer):
     def initialize(self) -> bool:
         """Initialize VTK rendering system."""
         try:
-            logger.info("Initializing VTK renderer")
+            logger.info(f"Initializing VTK renderer with size: {self.width}x{self.height}")
             
             # Create renderer
             self.renderer = vtk.vtkRenderer()
@@ -45,12 +37,49 @@ class VTKRenderer(BaseRenderer):
             
             # Create render window
             self.render_window = vtk.vtkRenderWindow()
-            self.render_window.SetSize(self.width, self.height)
-            self.render_window.AddRenderer(self.renderer)
-            self.render_window.SetOffScreenRendering(1)  # Enable off-screen rendering
+            
+            # Try different initialization approaches for better compatibility
+            try:
+                # Method 1: Standard off-screen rendering
+                self.render_window.SetOffScreenRendering(1)
+                self.render_window.SetSize(self.width, self.height)
+                self.render_window.AddRenderer(self.renderer)
+                self.render_window.Modified()
+                
+                # Test if the window size was set correctly
+                test_size = self.render_window.GetSize()
+                if test_size[0] != self.width or test_size[1] != self.height:
+                    logger.warning(f"Initial size setting failed: got {test_size[0]}x{test_size[1]}, expected {self.width}x{self.height}")
+                    
+                    # Force size setting multiple times if needed
+                    for attempt in range(3):
+                        self.render_window.SetSize(self.width, self.height)
+                        self.render_window.Modified()
+                        current_size = self.render_window.GetSize()
+                        if current_size[0] == self.width and current_size[1] == self.height:
+                            logger.info(f"Window size set correctly on attempt {attempt + 1}")
+                            break
+                        logger.warning(f"Attempt {attempt + 1}: size still {current_size[0]}x{current_size[1]}")
+                    
+            except Exception as init_error:
+                logger.error(f"Standard initialization failed: {init_error}, trying fallback")
+                # Method 2: Fallback initialization
+                self.render_window = vtk.vtkRenderWindow()
+                self.render_window.AddRenderer(self.renderer)
+                self.render_window.SetOffScreenRendering(1)
+                self.render_window.SetSize(self.width, self.height)
+                self.render_window.Modified()
             
             # Create camera
             self.camera = self.renderer.GetActiveCamera()
+            
+            # Final verification
+            actual_size = self.render_window.GetSize()
+            logger.info(f"VTK render window initialized with final size: {actual_size[0]}x{actual_size[1]}")
+            
+            if actual_size[0] != self.width or actual_size[1] != self.height:
+                logger.error(f"CRITICAL: Window size verification failed! Expected {self.width}x{self.height}, got {actual_size[0]}x{actual_size[1]}")
+                # Still mark as initialized but log the discrepancy
             
             self.is_initialized = True
             logger.info("VTK renderer initialized successfully")
@@ -208,8 +237,18 @@ class VTKRenderer(BaseRenderer):
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Ensure render window size is set correctly before rendering
+            self.render_window.SetSize(self.width, self.height)
+            logger.debug(f"Set render window size to: {self.width} x {self.height}")
+            
             # Render
+            logger.critical(f"BEFORE RENDER: Window size = {self.render_window.GetSize()}")
             self.render_window.Render()
+            logger.critical(f"AFTER RENDER: Window size = {self.render_window.GetSize()}")
+            
+            # Verify the actual window size after rendering
+            actual_size = self.render_window.GetSize()
+            logger.debug(f"Actual render window size after render: {actual_size[0]} x {actual_size[1]}")
             
             # Capture screenshot
             window_to_image = vtk.vtkWindowToImageFilter()
@@ -244,8 +283,16 @@ class VTKRenderer(BaseRenderer):
                 logger.error("Render window not initialized")
                 return None
             
+            # Ensure render window size is set correctly before rendering
+            self.render_window.SetSize(self.width, self.height)
+            logger.debug(f"Set render window size to: {self.width} x {self.height}")
+            
             # Render
             self.render_window.Render()
+            
+            # Verify the actual window size after rendering
+            actual_size = self.render_window.GetSize()
+            logger.debug(f"Actual render window size after render: {actual_size[0]} x {actual_size[1]}")
             
             # Capture to VTK image
             window_to_image = vtk.vtkWindowToImageFilter()
