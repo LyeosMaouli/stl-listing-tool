@@ -6,6 +6,7 @@
 
 - [ ] Folder import
 - [ ] Queue
+- [ ] Change rendered display image path from C:\Users\user\AppData\Local\Temp\stl_render.png to project folder ./tmp
 
 ## Cleanup
 
