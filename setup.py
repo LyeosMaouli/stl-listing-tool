@@ -77,9 +77,9 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "stl-processor=cli:cli",
-            "stl-proc=cli:cli",  # Shorter alias
-            "stl-gui=gui_batch:main",  # Main GUI (supports both single and batch)
+            "stl-processor=src.cli:cli",
+            "stl-proc=src.cli:cli",  # Shorter alias
+            "stl-gui=src.gui_batch:main",  # Main GUI (supports both single and batch)
         ],
     },
     include_package_data=True,
