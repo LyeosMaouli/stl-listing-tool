@@ -663,6 +663,7 @@ class STLProcessorGUI:
                 logger.info(f"Starting render to temp path: {temp_path}")
                 
                 # Final window size check before rendering
+                logger.critical(f"ABOUT TO CALL renderer.render() with window size: {renderer.render_window.GetSize()}")
                 if hasattr(renderer, 'render_window') and renderer.render_window:
                     pre_render_size = renderer.render_window.GetSize()
                     logger.info(f"Window size before render: {pre_render_size[0]}x{pre_render_size[1]}")

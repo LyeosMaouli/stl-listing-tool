@@ -242,7 +242,9 @@ class VTKRenderer(BaseRenderer):
             logger.debug(f"Set render window size to: {self.width} x {self.height}")
             
             # Render
+            logger.critical(f"BEFORE RENDER: Window size = {self.render_window.GetSize()}")
             self.render_window.Render()
+            logger.critical(f"AFTER RENDER: Window size = {self.render_window.GetSize()}")
             
             # Verify the actual window size after rendering
             actual_size = self.render_window.GetSize()

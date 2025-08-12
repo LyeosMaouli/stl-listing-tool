@@ -7,7 +7,7 @@ from typing import Optional
 def setup_logger(
     name: str = "stl_processor",
     log_file: Optional[str] = None,
-    log_level: str = "INFO",
+    log_level: str = "DEBUG",
     console: bool = True
 ) -> logging.Logger:
     """
