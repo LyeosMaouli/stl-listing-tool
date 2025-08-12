@@ -93,7 +93,6 @@ class STLProcessorGUI:
         self.user_config = get_user_config()
         
         self.setup_ui()
-        self.setup_drag_drop()
         self.load_user_settings()
         
         # Save window geometry on close
@@ -273,6 +272,9 @@ class STLProcessorGUI:
                                  bg="lightgray", fg="gray", 
                                  border=2, relief="ridge", height=3)
         self.drop_area.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        
+        # Setup drag and drop after drop_area is created
+        self.setup_drag_drop()
         
     def create_notebook(self):
         self.notebook = ttk.Notebook(self.main_frame)
@@ -459,9 +461,21 @@ class STLProcessorGUI:
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
             self.dnd_available = True
+            logger.info("Drag-and-drop functionality initialized successfully")
         except ImportError:
             self.dnd_available = False
             logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            # Update drop area to show drag-and-drop is unavailable
+            self.drop_area.config(
+                text="Drag-and-drop unavailable\nUse Browse button instead",
+                bg="lightyellow",
+                fg="darkgray"
+            )
+        except Exception as e:
+            # Handle tkdnd initialization errors (common on Windows)
+            self.dnd_available = False
+            logger.warning(f"Drag-and-drop initialization failed: {e}")
+            logger.info("This is common on Windows. Drag-and-drop disabled, browse buttons still work.")
             # Update drop area to show drag-and-drop is unavailable
             self.drop_area.config(
                 text="Drag-and-drop unavailable\nUse Browse button instead",

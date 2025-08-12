@@ -198,13 +198,42 @@ class BatchProcessingGUI(STLProcessorGUI):
         """Update file selection UI for single file mode."""
         self.single_browse_btn.grid()
         self.batch_browse_btn.grid_remove()
-        self.drop_area.config(text="Drop STL files here")
+        
+        if hasattr(self, 'dnd_available') and self.dnd_available:
+            self.drop_area.config(text="Drop STL files here", bg="lightgray", fg="gray")
+        else:
+            self.drop_area.config(text="Drag-and-drop unavailable\nUse Browse File button instead", 
+                                bg="lightyellow", fg="darkgray")
         
     def update_file_selection_for_batch(self):
         """Update file selection UI for batch mode."""
         self.single_browse_btn.grid_remove()
         self.batch_browse_btn.grid()
-        self.drop_area.config(text="Drop STL files or folders here")
+        
+        if hasattr(self, 'dnd_available') and self.dnd_available:
+            self.drop_area.config(text="Drop STL files or folders here", bg="lightgray", fg="gray")
+        else:
+            self.drop_area.config(text="Drag-and-drop unavailable\nUse Browse Folder button instead",
+                                bg="lightyellow", fg="darkgray")
+    
+    def setup_drag_drop(self):
+        """Override to provide batch-specific drag-drop messaging."""
+        try:
+            # Call parent setup_drag_drop
+            super().setup_drag_drop()
+        except Exception as e:
+            # If parent fails, handle gracefully for batch mode
+            logger.warning(f"Drag-and-drop setup failed: {e}")
+            self.dnd_available = False
+            logger.info("Drag-and-drop disabled. Browse buttons will work normally.")
+            
+            # Update drop area messaging for batch mode
+            if hasattr(self, 'drop_area'):
+                self.drop_area.config(
+                    text="Drag-and-drop unavailable\nUse Browse buttons instead",
+                    bg="lightyellow",
+                    fg="darkgray"
+                )
     
     def browse_folder(self):
         """Browse for folder containing STL files."""
