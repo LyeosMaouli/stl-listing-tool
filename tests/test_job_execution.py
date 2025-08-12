@@ -8,10 +8,10 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.queue.job_types import Job, JobStatus, JobResult, JobError
-from src.queue.job_executor import JobExecutor, JobExecutionEngine
-from src.queue.error_handler import ErrorHandler
-from src.queue.enhanced_job_manager import EnhancedJobManager
+from src.batch_queue.job_types import Job, JobStatus, JobResult, JobError
+from src.batch_queue.job_executor import JobExecutor, JobExecutionEngine
+from src.batch_queue.error_handler import ErrorHandler
+from src.batch_queue.enhanced_job_manager import EnhancedJobManager
 
 
 # Mock job executor for testing

@@ -17,7 +17,7 @@ def test_job_manager():
     """Test the central job manager functionality."""
     print("Testing JobManager...")
     
-    from queue import (
+    from batch_queue import (
         JobManager, JobType, RenderOptions, ValidationOptions,
         create_job_from_stl
     )
@@ -96,7 +96,7 @@ def test_scan_and_add():
     """Test scanning directories and adding jobs."""
     print("\nTesting scan and add functionality...")
     
-    from queue import JobManager, JobType, RenderOptions
+    from batch_queue import JobManager, JobType, RenderOptions
     
     # Create temporary directory structure
     temp_dir = Path(tempfile.mkdtemp())
@@ -160,7 +160,7 @@ def test_configuration_templates():
     """Test configuration template system."""
     print("\nTesting configuration templates...")
     
-    from queue import QueueConfiguration, RenderOptions
+    from batch_queue import QueueConfiguration, RenderOptions
     
     # Create temporary config directory
     temp_dir = Path(tempfile.mkdtemp())
@@ -207,7 +207,7 @@ def test_job_history():
     """Test job history database functionality."""
     print("\nTesting job history database...")
     
-    from queue import (
+    from batch_queue import (
         JobHistoryManager, QueueJob, JobResults, JobType, JobState,
         create_render_job, RenderOptions
     )
@@ -265,7 +265,7 @@ def test_progress_integration():
     """Test progress tracking integration."""
     print("\nTesting progress tracking integration...")
     
-    from queue import JobManager, ProgressTracker, JobProgress
+    from batch_queue import JobManager, ProgressTracker, JobProgress
     
     job_manager = JobManager()
     

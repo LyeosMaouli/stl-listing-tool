@@ -33,6 +33,14 @@ The project has core functionality implemented with **critical deployment issues
   - `src/utils/logger.py`: Structured logging with file/console output
   - `src/cli.py`: Click-based CLI interface
 
+- ✅ **Batch Processing System** (`src/batch_queue/`)
+  - `enhanced_job_manager.py`: Complete batch processing management with execution engine
+  - `job_executor.py`: Multi-threaded job execution with pause/resume capabilities
+  - `job_handlers/`: Specialized handlers for render, validation, and analysis jobs
+  - `error_handler.py`: Intelligent error classification and recovery strategies
+  - `recovery_manager.py`: Session recovery from unexpected shutdowns
+  - `progress_tracker.py`: Real-time progress tracking with observer patterns
+
 - ✅ **Testing & Packaging**
   - `tests/`: Comprehensive test suite with fixtures
   - `setup.py`: Package configuration with entry points
@@ -99,6 +107,12 @@ stl-processor render model.stl output.png --material plastic --lighting studio
 
 # Calculate scale information
 stl-processor scale model.stl --height 28
+
+# Batch processing (Phase 2 - NEW)
+stl-processor batch process-folder ./models/ ./output/ --job-type render
+stl-processor batch list-jobs
+stl-processor batch start-processing
+stl-processor batch pause-processing
 ```
 
 

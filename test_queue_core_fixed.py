@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 try:
     # Try to import with rendering dependencies
-    from queue import (
+    from batch_queue import (
         JobType, JobState, RenderOptions, ValidationOptions,
         QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
     )
@@ -20,7 +20,7 @@ try:
     RENDERING_AVAILABLE = True
 except ImportError:
     # Import without rendering dependencies (uses fallback enums)
-    from queue import (
+    from batch_queue import (
         JobType, JobState, RenderOptions, ValidationOptions,
         QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
     )

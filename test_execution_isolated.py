@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import execution classes directly to avoid module name conflicts
-from queue.job_types_v2 import Job, JobStatus, JobResult, JobError
-from queue.enhanced_job_manager import EnhancedJobManager
+from batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
+from batch_queue.enhanced_job_manager import EnhancedJobManager
 
 
 class MockJobExecutor:

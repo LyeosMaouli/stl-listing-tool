@@ -13,9 +13,9 @@ repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "src"))
 
-from queue.job_types_v2 import Job, JobStatus, JobResult, JobError
-from queue.job_executor import JobExecutor, JobExecutionEngine
-from queue.enhanced_job_manager import EnhancedJobManager
+from batch_queue.job_types_v2 import Job, JobStatus, JobResult, JobError
+from batch_queue.job_executor import JobExecutor, JobExecutionEngine
+from batch_queue.enhanced_job_manager import EnhancedJobManager
 
 
 class MockJobExecutor(JobExecutor):

@@ -10,7 +10,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from queue import (
+from batch_queue import (
     JobType, JobState, RenderOptions, ValidationOptions,
     QueueJob, create_render_job, JobQueue, FileScanner, ProgressTracker
 )
