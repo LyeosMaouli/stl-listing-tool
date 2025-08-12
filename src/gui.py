@@ -253,6 +253,28 @@ class STLProcessorGUI:
         ttk.Entry(size_frame, textvariable=self.height_var, width=8).pack(side=tk.LEFT)
         ttk.Label(size_frame, text=" pixels").pack(side=tk.LEFT)
         
+        # Background image selection
+        ttk.Label(settings_frame, text="Background:").grid(row=2, column=0, sticky=tk.W, padx=(0, 10), pady=(10, 0))
+        bg_frame = ttk.Frame(settings_frame)
+        bg_frame.grid(row=2, column=1, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
+        
+        self.background_var = tk.StringVar(value="No background selected")
+        self.background_path = None
+        
+        ttk.Button(bg_frame, text="Select Background...", 
+                  command=self.browse_background_image).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(bg_frame, text="Clear", 
+                  command=self.clear_background_image).pack(side=tk.LEFT, padx=(0, 10))
+        
+        bg_status_label = ttk.Label(bg_frame, textvariable=self.background_var, 
+                                   foreground="gray")
+        bg_status_label.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Background preview (small thumbnail)
+        self.bg_preview = tk.Label(bg_frame, text="", bg="lightgray", width=8, height=4,
+                                  relief="sunken", bd=1)
+        self.bg_preview.pack(side=tk.LEFT)
+        
         render_button_frame = ttk.Frame(self.rendering_frame)
         render_button_frame.grid(row=1, column=0, columnspan=2, pady=10)
         
@@ -559,6 +581,67 @@ class STLProcessorGUI:
                 self.progress_var.set(0)
                 
         threading.Thread(target=run_validation, daemon=True).start()
+    
+    def browse_background_image(self):
+        """Open file dialog to select background image."""
+        file_path = filedialog.askopenfilename(
+            title="Select Background Image",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.bmp *.gif *.tiff"),
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All files", "*.*")
+            ]
+        )
+        if file_path:
+            self.background_path = Path(file_path)
+            # Show filename in the status label
+            filename = self.background_path.name
+            if len(filename) > 40:
+                filename = filename[:37] + "..."
+            self.background_var.set(f"Selected: {filename}")
+            self.status_var.set(f"Background image selected: {self.background_path.name}")
+            logger.info(f"Background image selected: {self.background_path}")
+            
+            # Show preview thumbnail
+            self.update_background_preview()
+    
+    def clear_background_image(self):
+        """Clear the selected background image."""
+        self.background_path = None
+        self.background_var.set("No background selected")
+        self.status_var.set("Background image cleared")
+        logger.info("Background image cleared")
+        
+        # Clear preview
+        self.bg_preview.config(image="", text="")
+        if hasattr(self.bg_preview, 'image'):
+            delattr(self.bg_preview, 'image')
+    
+    def update_background_preview(self):
+        """Update the background image preview thumbnail."""
+        if not self.background_path or not self.background_path.exists():
+            return
+        
+        try:
+            from PIL import Image, ImageTk
+            
+            # Load and create small thumbnail
+            with Image.open(self.background_path) as img:
+                # Create thumbnail (64x48 pixels to fit in the preview widget)
+                img.thumbnail((64, 48), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                
+                # Update preview widget
+                self.bg_preview.config(image=photo, text="")
+                self.bg_preview.image = photo  # Keep reference to prevent garbage collection
+                
+        except ImportError:
+            # PIL not available, show text instead
+            self.bg_preview.config(text="IMG", image="")
+        except Exception as e:
+            logger.warning(f"Failed to create background preview: {e}")
+            self.bg_preview.config(text="ERR", image="")
         
     def display_validation_results(self, results):
         output = []
@@ -622,6 +705,16 @@ class STLProcessorGUI:
                 
                 logger.info(f"Creating VTK renderer with dimensions: {width}x{height}")
                 renderer = VTKRenderer(width, height)
+                
+                # Set background image if selected
+                if self.background_path and self.background_path.exists():
+                    self.status_var.set("Loading background image...")
+                    logger.info(f"Setting background image: {self.background_path}")
+                    if not renderer.set_background_image(self.background_path):
+                        logger.warning(f"Failed to load background image: {self.background_path}")
+                        # Continue with rendering but without background
+                    else:
+                        logger.info("Background image loaded successfully")
                 
                 # Explicitly initialize the renderer first
                 logger.info("Initializing VTK renderer...")
@@ -691,6 +784,8 @@ class STLProcessorGUI:
                         "render_height": self.height_var.get(),
                         "material_type": self.material_var.get(),
                         "lighting_preset": self.lighting_var.get(),
+                        "background_image": str(self.background_path) if self.background_path else "None",
+                        "has_background": self.background_path is not None,
                         "processor_loaded": self.processor is not None
                     }
                 )
