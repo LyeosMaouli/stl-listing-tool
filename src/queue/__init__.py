@@ -34,6 +34,17 @@ from .job_manager import (
     create_job_manager, get_default_job_manager
 )
 
+# Phase 2: Job Execution Engine
+from .job_types_v2 import Job as ExecutionJob, JobStatus, JobResult, JobError
+from .job_executor import JobExecutor, JobExecutionEngine
+from .job_handlers import RenderJobHandler, ValidationJobHandler, AnalysisJobHandler
+from .error_handler import (
+    ErrorHandler, ErrorSeverity, ErrorCategory, 
+    RetryManager, RecoveryStrategy, ErrorClassifier
+)
+from .recovery_manager import SessionRecoveryManager
+from .enhanced_job_manager import EnhancedJobManager
+
 __all__ = [
     # Job types and models
     'JobType', 'JobState', 'ValidationLevel',
@@ -62,5 +73,13 @@ __all__ = [
     
     # Job management
     'JobManager', 'QueueManagerError',
-    'create_job_manager', 'get_default_job_manager'
+    'create_job_manager', 'get_default_job_manager',
+    
+    # Phase 2: Job Execution Engine
+    'ExecutionJob', 'JobStatus', 'JobResult', 'JobError',
+    'JobExecutor', 'JobExecutionEngine',
+    'RenderJobHandler', 'ValidationJobHandler', 'AnalysisJobHandler',
+    'ErrorHandler', 'ErrorSeverity', 'ErrorCategory',
+    'RetryManager', 'RecoveryStrategy', 'ErrorClassifier',
+    'SessionRecoveryManager', 'EnhancedJobManager'
 ]
