@@ -566,21 +566,22 @@ class STLProcessorGUI:
                 'video_rendering': video_rendering
             }
             
-            # Create output directory in user data location
-            import tempfile
-            import os
+            # Use the configured output directory (with fallback if not initialized)
+            if hasattr(self, 'current_output_folder') and self.current_output_folder:
+                output_dir = Path(self.current_output_folder)
+            else:
+                # Fallback if not initialized yet
+                output_dir = Path(self._get_default_output_folder())
             
-            if os.name == 'nt':  # Windows
-                output_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "stl_processing_output"
-            else:  # Unix/Linux/Mac
-                output_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "stl_processing_output"
-            
-            # Fallback to temp directory if home directory fails
+            # Ensure the output directory exists
             try:
                 output_dir.mkdir(parents=True, exist_ok=True)
-            except (OSError, PermissionError):
-                output_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Could not create output directory {output_dir}: {e}")
+                # Fallback to default directory
+                output_dir = Path(self._get_default_output_folder())
                 output_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Using fallback output directory: {output_dir}")
             
             # Add jobs to queue with processing options
             # For now, we'll use "render" job type but log the options
@@ -893,7 +894,7 @@ class STLProcessorGUI:
         """Create enhanced queue control buttons and processing options."""
         control_frame = ttk.LabelFrame(self.batch_tab, text="Queue Controls", padding="10")
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-        control_frame.columnconfigure(1, weight=1)  # Spacer column to separate buttons and checkboxes
+        control_frame.columnconfigure(3, weight=1)  # Spacer column to separate buttons and options
         
         # Left side: Control buttons
         button_frame = ttk.Frame(control_frame)
@@ -931,9 +932,26 @@ class STLProcessorGUI:
         )
         self.control_buttons['clear'].grid(row=0, column=4, padx=(5, 0))
         
-        # Right side: Processing options (NEW)
+        # Middle: Output folder selection (NEW)
+        output_frame = ttk.Frame(control_frame)
+        output_frame.grid(row=0, column=1, padx=(20, 20))
+        
+        ttk.Button(
+            output_frame, text="Output Folder...", 
+            command=self.select_output_folder
+        ).grid(row=0, column=0)
+        
+        # Initialize and display current output folder
+        self.current_output_folder = self.user_config.get('output_folder', self._get_default_output_folder())
+        self.output_folder_var = tk.StringVar(value=self._format_folder_display(self.current_output_folder))
+        ttk.Label(
+            output_frame, textvariable=self.output_folder_var,
+            foreground="gray", font=('TkDefaultFont', 8)
+        ).grid(row=1, column=0, sticky=tk.W, pady=(2, 0))
+        
+        # Right side: Processing options
         options_frame = ttk.LabelFrame(control_frame, text="Processing Options", padding="5")
-        options_frame.grid(row=0, column=2, sticky=tk.E, padx=(20, 0))
+        options_frame.grid(row=0, column=4, sticky=tk.E, padx=(20, 0))
         
         # Initialize processing option variables with user settings
         self.image_rendering_var = tk.BooleanVar(value=self.user_config.get('enable_image_rendering', True))
@@ -955,7 +973,7 @@ class STLProcessorGUI:
         # Queue info (spans full width)
         self.queue_info_var = tk.StringVar(value="Queue empty")
         ttk.Label(control_frame, textvariable=self.queue_info_var).grid(
-            row=1, column=0, columnspan=3, sticky=tk.W, pady=(10, 0)
+            row=1, column=0, columnspan=5, sticky=tk.W, pady=(10, 0)
         )
     
     def create_job_list(self):
@@ -1088,7 +1106,7 @@ class STLProcessorGUI:
             logger.error(f"Error clearing completed jobs: {e}")
     
     def restart_processing(self):
-        """Restart the entire batch queue processing."""
+        """Reset job statuses to restart processing (keeps jobs in queue)."""
         if not self.job_manager:
             return
         
@@ -1096,19 +1114,19 @@ class STLProcessorGUI:
             # Stop current processing if running
             if self.job_manager.is_running:
                 response = messagebox.askyesno(
-                    "Restart Queue",
-                    "This will stop current processing and reset all jobs to pending. Continue?"
+                    "Restart Processing",
+                    "This will stop current processing and reset all job statuses to pending. The jobs will remain in the queue. Continue?"
                 )
                 if not response:
                     return
                     
                 self.job_manager.stop_processing()
             
-            # Reset all jobs to pending status (we'll need to add this method to job manager)
-            if hasattr(self.job_manager, 'reset_all_jobs'):
-                count = self.job_manager.reset_all_jobs()
+            # Reset job statuses only (don't clear the queue)
+            if hasattr(self.job_manager, 'reset_job_statuses'):
+                count = self.job_manager.reset_job_statuses()
             else:
-                # Fallback: clear completed and reset progress tracking
+                # Fallback: reset progress tracking only
                 count = 0
                 if hasattr(self.job_manager, 'progress_tracker'):
                     self.job_manager.progress_tracker.reset_tracking()
@@ -1118,27 +1136,39 @@ class STLProcessorGUI:
             self.control_buttons['pause'].config(state="disabled", text="Pause")
             self.control_buttons['stop'].config(state="disabled")
             
-            # Clear job tree display
+            # Update job tree display to show reset statuses (don't clear jobs)
             if hasattr(self, 'job_tree'):
                 for item in self.job_tree.get_children():
-                    self.job_tree.delete(item)
+                    # Update existing items to show "pending" status instead of deleting them
+                    values = list(self.job_tree.item(item)['values'])
+                    if len(values) >= 2:
+                        values[1] = "pending"  # Status column
+                        values[2] = "0%"       # Progress column
+                        self.job_tree.item(item, values=values)
             
-            # Reset progress
+            # Reset progress display
             if hasattr(self, 'overall_progress'):
                 self.overall_progress['value'] = 0
             if hasattr(self, 'progress_text_var'):
                 self.progress_text_var.set("Ready to process")
-            if hasattr(self, 'queue_info_var'):
-                self.queue_info_var.set("Queue reset - ready to start")
             
-            logger.info("Batch queue restarted by user")
-            messagebox.showinfo("Queue Restarted", "All jobs have been reset and are ready to process again.")
+            # Update queue info to reflect reset
+            if hasattr(self, 'queue_info_var') and self.job_manager:
+                try:
+                    summary = self.job_manager.get_queue_summary()
+                    total = summary.get('total_jobs', 0)
+                    self.queue_info_var.set(f"All {total} jobs reset to pending - ready to start")
+                except:
+                    self.queue_info_var.set("Job statuses reset - ready to start")
+            
+            logger.info("Batch queue job statuses reset by user")
+            messagebox.showinfo("Processing Reset", "All job statuses have been reset to pending. Jobs remain in queue and are ready to process again.")
             
         except Exception as e:
-            logger.error(f"Error restarting queue: {e}")
+            logger.error(f"Error resetting job statuses: {e}")
             show_error_with_logging(
                 self.root, "Restart Error",
-                f"Error restarting batch queue: {e}",
+                f"Error resetting job statuses: {e}",
                 exception=e
             )
     
@@ -1157,6 +1187,78 @@ class STLProcessorGUI:
             
         except Exception as e:
             logger.error(f"Error updating processing options: {e}")
+    
+    def select_output_folder(self):
+        """Open folder selection dialog for output directory."""
+        try:
+            # Get current folder or default
+            initial_folder = self.current_output_folder
+            
+            # Open folder selection dialog
+            selected_folder = filedialog.askdirectory(
+                title="Select Output Folder for Processed STL Files",
+                initialdir=initial_folder
+            )
+            
+            if selected_folder:
+                # Update current folder
+                self.current_output_folder = selected_folder
+                
+                # Save to user configuration
+                self.user_config.set('output_folder', selected_folder)
+                
+                # Update display
+                self.output_folder_var.set(self._format_folder_display(selected_folder))
+                
+                logger.info(f"Output folder updated to: {selected_folder}")
+                
+                # Show confirmation
+                messagebox.showinfo(
+                    "Output Folder Updated", 
+                    f"Output folder set to:\n{selected_folder}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error selecting output folder: {e}")
+            show_error_with_logging(
+                self.root, "Folder Selection Error",
+                f"Error selecting output folder: {e}",
+                exception=e
+            )
+    
+    def _get_default_output_folder(self):
+        """Get the default output folder based on platform."""
+        import tempfile
+        import os
+        
+        if os.name == 'nt':  # Windows
+            default_folder = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "stl_processing_output"
+        else:  # Unix/Linux/Mac
+            default_folder = Path.home() / ".local" / "share" / "stl_listing_tool" / "stl_processing_output"
+        
+        # Ensure the folder exists
+        try:
+            default_folder.mkdir(parents=True, exist_ok=True)
+            return str(default_folder)
+        except (OSError, PermissionError):
+            # Fallback to temp directory
+            fallback_folder = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
+            fallback_folder.mkdir(parents=True, exist_ok=True)
+            return str(fallback_folder)
+    
+    def _format_folder_display(self, folder_path):
+        """Format folder path for display (truncate if too long)."""
+        if not folder_path:
+            return "No folder selected"
+            
+        path_str = str(folder_path)
+        max_length = 50
+        
+        if len(path_str) <= max_length:
+            return path_str
+        else:
+            # Truncate in the middle, showing start and end
+            return f"{path_str[:20]}...{path_str[-25:]}"
     
     # Observer callbacks
     def on_queue_state_changed(self, summary: Dict[str, Any]):
