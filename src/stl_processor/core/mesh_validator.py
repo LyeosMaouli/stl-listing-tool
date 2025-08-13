@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from enum import Enum
 from pathlib import Path
 
-from utils.logger import logger
+from ..utils.logger import logger
 
 class ValidationLevel(Enum):
     """Validation strictness levels."""

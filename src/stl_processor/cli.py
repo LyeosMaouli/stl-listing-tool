@@ -3,12 +3,12 @@ from pathlib import Path
 import json
 from typing import Optional
 
-from core.stl_processor import STLProcessor
-from core.dimension_extractor import DimensionExtractor
-from core.mesh_validator import MeshValidator, ValidationLevel
-from rendering.vtk_renderer import VTKRenderer
-from rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
-from utils.logger import setup_logger
+from .core.stl_processor import STLProcessor
+from .core.dimension_extractor import DimensionExtractor
+from .core.mesh_validator import MeshValidator, ValidationLevel
+from .rendering.vtk_renderer import VTKRenderer
+from .rendering.base_renderer import MaterialType, LightingPreset, RenderQuality
+from .utils.logger import setup_logger
 
 # Setup logger
 logger = setup_logger("stl_processor_cli")
@@ -265,6 +265,178 @@ def _format_text_analysis(stl_file: Path, dimensions: dict, analysis: dict) -> s
     output.append("")
     
     return "\n".join(output)
+
+
+@cli.group()
+def batch():
+    """Batch processing commands for multiple STL files."""
+    pass
+
+
+@batch.command()
+@click.argument('input_path', type=click.Path(exists=True, path_type=Path))
+@click.argument('output_path', type=click.Path(path_type=Path))
+@click.option('--job-type', '-t', type=click.Choice(['render', 'validate', 'analyze', 'composite']),
+              default='composite', help='Type of processing to perform')
+@click.option('--recursive', '-r', is_flag=True, help='Scan subdirectories recursively')
+@click.option('--material', '-m', type=click.Choice(['plastic', 'metal', 'resin', 'ceramic', 'wood', 'glass']),
+              default='plastic', help='Material type for rendering')
+@click.option('--width', '-w', default=1920, help='Render width in pixels')
+@click.option('--height', '-h', default=1080, help='Render height in pixels')
+def process_folder(input_path: Path, output_path: Path, job_type: str, recursive: bool, 
+                   material: str, width: int, height: int):
+    """Process all STL files in a folder with batch processing."""
+    try:
+        from .batch_queue.enhanced_job_manager import EnhancedJobManager
+        from .batch_queue.job_types_v2 import Job
+        
+        logger.info(f"Starting batch processing of {input_path}")
+        
+        # Create output directory
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Scan for STL files
+        if recursive:
+            stl_files = list(input_path.rglob("*.stl"))
+        else:
+            stl_files = list(input_path.glob("*.stl"))
+        
+        if not stl_files:
+            click.echo(f"No STL files found in {input_path}")
+            return
+        
+        click.echo(f"Found {len(stl_files)} STL files")
+        
+        # Initialize job manager
+        job_manager = EnhancedJobManager(
+            max_workers=2,
+            state_dir=output_path / "batch_state",
+            auto_save=True
+        )
+        
+        # Add jobs to queue
+        job_ids = job_manager.add_jobs_from_files(
+            stl_files, output_path, job_type=job_type
+        )
+        
+        click.echo(f"Added {len(job_ids)} jobs to queue")
+        
+        # Start processing
+        if job_manager.start_processing():
+            click.echo("Processing started...")
+            
+            # Wait for completion
+            import time
+            while job_manager.is_running:
+                summary = job_manager.get_queue_summary()
+                completed = summary.get('completed_jobs', 0)
+                total = summary.get('total_jobs', 0)
+                click.echo(f"\rProgress: {completed}/{total} completed", nl=False)
+                time.sleep(2)
+            
+            click.echo(f"\nBatch processing completed!")
+        else:
+            click.echo("Failed to start processing")
+        
+        # Cleanup
+        job_manager.shutdown()
+        
+    except Exception as e:
+        logger.error(f"Error in batch processing: {e}")
+        click.echo(f"Error: {e}", err=True)
+
+
+@batch.command()
+def list_jobs():
+    """List current jobs in the batch queue."""
+    try:
+        from .batch_queue.enhanced_job_manager import EnhancedJobManager
+        
+        # Try to connect to existing job manager state
+        state_dir = Path.cwd() / "batch_state"
+        if not state_dir.exists():
+            click.echo("No batch queue state found")
+            return
+            
+        job_manager = EnhancedJobManager(
+            max_workers=1,
+            state_dir=state_dir,
+            auto_save=False
+        )
+        
+        summary = job_manager.get_queue_summary()
+        
+        click.echo("=== Batch Queue Status ===")
+        click.echo(f"Total Jobs: {summary.get('total_jobs', 0)}")
+        click.echo(f"Pending: {summary.get('pending_jobs', 0)}")
+        click.echo(f"Running: {summary.get('running_jobs', 0)}")
+        click.echo(f"Completed: {summary.get('completed_jobs', 0)}")
+        click.echo(f"Failed: {summary.get('failed_jobs', 0)}")
+        click.echo(f"Is Running: {summary.get('is_running', False)}")
+        
+        job_manager.shutdown()
+        
+    except Exception as e:
+        logger.error(f"Error listing jobs: {e}")
+        click.echo(f"Error: {e}", err=True)
+
+
+@batch.command()
+def start_processing():
+    """Start processing jobs in the batch queue."""
+    try:
+        from .batch_queue.enhanced_job_manager import EnhancedJobManager
+        
+        state_dir = Path.cwd() / "batch_state"
+        if not state_dir.exists():
+            click.echo("No batch queue found")
+            return
+            
+        job_manager = EnhancedJobManager(
+            max_workers=2,
+            state_dir=state_dir,
+            auto_save=True
+        )
+        
+        if job_manager.start_processing():
+            click.echo("Batch processing started")
+        else:
+            click.echo("Failed to start processing (no jobs or already running)")
+            
+        job_manager.shutdown()
+        
+    except Exception as e:
+        logger.error(f"Error starting processing: {e}")
+        click.echo(f"Error: {e}", err=True)
+
+
+@batch.command()
+def pause_processing():
+    """Pause batch processing."""
+    try:
+        from .batch_queue.enhanced_job_manager import EnhancedJobManager
+        
+        state_dir = Path.cwd() / "batch_state"
+        if not state_dir.exists():
+            click.echo("No batch queue found")
+            return
+            
+        job_manager = EnhancedJobManager(
+            max_workers=2,
+            state_dir=state_dir,
+            auto_save=True
+        )
+        
+        if job_manager.pause_processing():
+            click.echo("Batch processing paused")
+        else:
+            click.echo("Failed to pause processing (not running)")
+            
+        job_manager.shutdown()
+        
+    except Exception as e:
+        logger.error(f"Error pausing processing: {e}")
+        click.echo(f"Error: {e}", err=True)
 
 
 if __name__ == '__main__':
