@@ -7,11 +7,11 @@ from typing import Optional, Dict, Any
 import os
 import tempfile
 
-# Use absolute imports for entry point compatibility
+# Use relative imports for package structure
 try:
-    from core.stl_processor import STLProcessor
-    from core.dimension_extractor import DimensionExtractor
-    from core.mesh_validator import MeshValidator, ValidationLevel
+    from .core.stl_processor import STLProcessor
+    from .core.dimension_extractor import DimensionExtractor
+    from .core.mesh_validator import MeshValidator, ValidationLevel
     CORE_MODULES_AVAILABLE = True
     CORE_IMPORT_ERROR = None
 except ImportError as e:
@@ -19,22 +19,22 @@ except ImportError as e:
     CORE_IMPORT_ERROR = e
 
 try:
-    from rendering.vtk_renderer import VTKRenderer
-    from rendering.base_renderer import MaterialType, LightingPreset
+    from .rendering.vtk_renderer import VTKRenderer
+    from .rendering.base_renderer import MaterialType, LightingPreset
     RENDERING_MODULES_AVAILABLE = True
     RENDERING_IMPORT_ERROR = None
 except ImportError as e:
     RENDERING_MODULES_AVAILABLE = False
     RENDERING_IMPORT_ERROR = e
 
-from utils.logger import setup_logger
-from error_dialog import show_comprehensive_error
-from user_config import get_user_config
+from .utils.logger import setup_logger
+from .error_dialog import show_comprehensive_error
+from .user_config import get_user_config
 
 # Import generators with fallback
 try:
-    from generators.video_generator import RotationVideoGenerator, VideoFormat, VideoQuality
-    from generators.image_generator import ColorVariationGenerator, GridLayout
+    from .generators.video_generator import RotationVideoGenerator, VideoFormat, VideoQuality
+    from .generators.image_generator import ColorVariationGenerator, GridLayout
     GENERATORS_AVAILABLE = True
     GENERATORS_IMPORT_ERROR = None
 except ImportError as e:
@@ -1250,7 +1250,7 @@ class STLProcessorGUI:
                 if not RENDERING_MODULES_AVAILABLE:
                     raise Exception("Rendering modules not available")
                 
-                from rendering.vtk_renderer import VTKRenderer
+                from .rendering.vtk_renderer import VTKRenderer
                 width = int(self.width_var.get())
                 height = int(self.height_var.get())
                 renderer = VTKRenderer(width, height)
@@ -1262,7 +1262,7 @@ class STLProcessorGUI:
                     raise Exception("Failed to setup scene")
                 
                 # Apply current material and lighting settings
-                from rendering.base_renderer import MaterialType, LightingPreset
+                from .rendering.base_renderer import MaterialType, LightingPreset
                 material_type = MaterialType(self.material_var.get())
                 renderer.set_material(material_type, (0.8, 0.8, 0.8))
                 
@@ -1343,7 +1343,7 @@ class STLProcessorGUI:
                 if not RENDERING_MODULES_AVAILABLE:
                     raise Exception("Rendering modules not available")
                 
-                from rendering.vtk_renderer import VTKRenderer
+                from .rendering.vtk_renderer import VTKRenderer
                 renderer = VTKRenderer(300, 300)
                 
                 if not renderer.initialize():

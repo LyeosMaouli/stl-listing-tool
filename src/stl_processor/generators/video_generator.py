@@ -12,7 +12,7 @@ from enum import Enum
 import threading
 import time
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 
 # Import moviepy with fallback
 try:

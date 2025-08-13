@@ -11,7 +11,7 @@ import numpy as np
 from enum import Enum
 import math
 
-from utils.logger import setup_logger
+from ..utils.logger import setup_logger
 
 # Import PIL with fallback
 try:
@@ -176,7 +176,7 @@ class ColorVariationGenerator:
         try:
             # Apply material if specified
             if 'material' in variant and hasattr(renderer, 'set_material'):
-                from rendering.base_renderer import MaterialType
+                from ..rendering.base_renderer import MaterialType
                 material = MaterialType(variant['material'])
                 color = variant.get('color', (0.8, 0.8, 0.8))
                 renderer.set_material(material, color)

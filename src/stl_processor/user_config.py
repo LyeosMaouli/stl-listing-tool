@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import platform
 import threading
-from utils.logger import setup_logger
+from .utils.logger import setup_logger
 
 logger = setup_logger("user_config")
 
