@@ -47,7 +47,7 @@ The project has core functionality implemented with **critical deployment issues
   - `recovery_manager.py`: Session recovery from unexpected shutdowns
   - `progress_tracker.py`: Real-time progress tracking with observer patterns
 
-- ✅ **Unified GUI** (`src/gui_batch.py`)
+- ✅ **Unified GUI** (`src/gui.py`)
   - Single GUI application dedicated to batch processing of STL files
   - Drag-and-drop interface for files and folders with graceful degradation
   - Enhanced file selection with browse buttons for files and folders
