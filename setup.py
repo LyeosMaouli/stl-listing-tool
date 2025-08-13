@@ -79,7 +79,7 @@ setup(
         "console_scripts": [
             "stl-processor=stl_processor.cli:cli",
             "stl-proc=stl_processor.cli:cli",  # Shorter alias
-            "stl-gui=stl_processor.gui:main",  # Unified batch processing GUI
+            "stl-gui=stl_processor.gui_batch:main",  # Unified batch processing GUI
         ],
     },
     include_package_data=True,
