@@ -242,9 +242,6 @@ class STLProcessorGUI:
                 )
                 return
         
-        # Add batch queue tab
-        self.create_batch_queue_tab()
-        
         # Start update timer
         self.start_update_timer()
     
@@ -547,11 +544,27 @@ class STLProcessorGUI:
             )
     
     def add_files_to_batch_queue(self, stl_files):
-        """Add STL files to the batch processing queue."""
+        """Add STL files to batch queue with user-selected processing options."""
         try:
             if not self.job_manager:
                 logger.error("Job manager not initialized")
                 return
+            
+            # Get user preferences from checkboxes
+            enable_image_rendering = getattr(self, 'image_rendering_var', None)
+            enable_video_rendering = getattr(self, 'video_rendering_var', None)
+            
+            # Default to True if variables don't exist yet (during initialization)
+            image_rendering = enable_image_rendering.get() if enable_image_rendering else True
+            video_rendering = enable_video_rendering.get() if enable_video_rendering else True
+            
+            # Create job options based on checkboxes
+            job_options = {
+                'analysis': True,      # Always enabled
+                'validation': True,    # Always enabled  
+                'image_rendering': image_rendering,
+                'video_rendering': video_rendering
+            }
             
             # Create output directory in user data location
             import tempfile
@@ -569,19 +582,29 @@ class STLProcessorGUI:
                 output_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
                 output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Add jobs to queue
+            # Add jobs to queue with processing options
+            # For now, we'll use "render" job type but log the options
             job_ids = self.job_manager.add_jobs_from_files(
                 stl_files, output_dir, job_type="render"
             )
             
-            logger.info(f"Added {len(job_ids)} jobs to queue")
+            logger.info(f"Added {len(job_ids)} jobs to queue with options: {job_options}")
+            
+            # Create descriptive status message
+            enabled_processes = []
+            if job_options['image_rendering']:
+                enabled_processes.append("Images")
+            if job_options['video_rendering']:
+                enabled_processes.append("Videos")
+            
+            process_text = " + ".join(enabled_processes) if enabled_processes else "Analysis only"
             
             # Update status
-            self.file_status_var.set(f"Added {len(stl_files)} STL files to queue")
+            self.file_status_var.set(f"Added {len(stl_files)} STL files to queue ({process_text})")
             
             messagebox.showinfo(
                 "Files Added", 
-                f"Added {len(stl_files)} STL files to batch queue"
+                f"Added {len(stl_files)} STL files to batch queue\nProcessing: Analysis + Validation + {process_text}"
             )
             
         except Exception as e:
@@ -605,10 +628,14 @@ class STLProcessorGUI:
         return temp_dir / "stl_render.png"
     
     def create_notebook(self):
-        """Create notebook with all tabs."""
+        """Create notebook with batch queue as first tab (primary focus)."""
         self.notebook = ttk.Notebook(self.main_frame)
         self.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
+        # Batch Queue first (primary focus for batch processing)
+        self.create_batch_queue_tab()
+        
+        # Individual processing tabs
         self.create_analysis_tab()
         self.create_validation_tab()
         self.create_rendering_tab()
@@ -863,39 +890,72 @@ class STLProcessorGUI:
         self.create_progress_panel()
     
     def create_queue_controls(self):
-        """Create queue control buttons."""
+        """Create enhanced queue control buttons and processing options."""
         control_frame = ttk.LabelFrame(self.batch_tab, text="Queue Controls", padding="10")
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        control_frame.columnconfigure(1, weight=1)  # Spacer column to separate buttons and checkboxes
         
-        # Control buttons
+        # Left side: Control buttons
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=0, column=0, sticky=tk.W)
+        
+        # Buttons: Start, Pause, Stop, Restart, Clear
         self.control_buttons['start'] = ttk.Button(
-            control_frame, text="Start Processing", 
+            button_frame, text="Start Processing", 
             command=self.start_processing
         )
         self.control_buttons['start'].grid(row=0, column=0, padx=(0, 5))
         
         self.control_buttons['pause'] = ttk.Button(
-            control_frame, text="Pause", 
+            button_frame, text="Pause", 
             command=self.pause_processing, state="disabled"
         )
         self.control_buttons['pause'].grid(row=0, column=1, padx=5)
         
         self.control_buttons['stop'] = ttk.Button(
-            control_frame, text="Stop", 
+            button_frame, text="Stop", 
             command=self.stop_processing, state="disabled"
         )
         self.control_buttons['stop'].grid(row=0, column=2, padx=5)
         
+        # NEW: Restart button
+        self.control_buttons['restart'] = ttk.Button(
+            button_frame, text="Restart", 
+            command=self.restart_processing
+        )
+        self.control_buttons['restart'].grid(row=0, column=3, padx=5)
+        
         self.control_buttons['clear'] = ttk.Button(
-            control_frame, text="Clear Completed", 
+            button_frame, text="Clear Completed", 
             command=self.clear_completed
         )
-        self.control_buttons['clear'].grid(row=0, column=3, padx=(5, 0))
+        self.control_buttons['clear'].grid(row=0, column=4, padx=(5, 0))
         
-        # Queue info
+        # Right side: Processing options (NEW)
+        options_frame = ttk.LabelFrame(control_frame, text="Processing Options", padding="5")
+        options_frame.grid(row=0, column=2, sticky=tk.E, padx=(20, 0))
+        
+        # Initialize processing option variables with user settings
+        self.image_rendering_var = tk.BooleanVar(value=self.user_config.get('enable_image_rendering', True))
+        self.video_rendering_var = tk.BooleanVar(value=self.user_config.get('enable_video_rendering', True))
+        
+        # Create checkboxes
+        ttk.Checkbutton(
+            options_frame, text="Image Rendering", 
+            variable=self.image_rendering_var,
+            command=self.on_processing_option_changed
+        ).grid(row=0, column=0, padx=(0, 10), sticky=tk.W)
+        
+        ttk.Checkbutton(
+            options_frame, text="Video Rendering", 
+            variable=self.video_rendering_var,
+            command=self.on_processing_option_changed
+        ).grid(row=0, column=1, sticky=tk.W)
+        
+        # Queue info (spans full width)
         self.queue_info_var = tk.StringVar(value="Queue empty")
         ttk.Label(control_frame, textvariable=self.queue_info_var).grid(
-            row=1, column=0, columnspan=4, sticky=tk.W, pady=(10, 0)
+            row=1, column=0, columnspan=3, sticky=tk.W, pady=(10, 0)
         )
     
     def create_job_list(self):
@@ -1026,6 +1086,77 @@ class STLProcessorGUI:
                 messagebox.showinfo("No Jobs", "No completed jobs to clear")
         except Exception as e:
             logger.error(f"Error clearing completed jobs: {e}")
+    
+    def restart_processing(self):
+        """Restart the entire batch queue processing."""
+        if not self.job_manager:
+            return
+        
+        try:
+            # Stop current processing if running
+            if self.job_manager.is_running:
+                response = messagebox.askyesno(
+                    "Restart Queue",
+                    "This will stop current processing and reset all jobs to pending. Continue?"
+                )
+                if not response:
+                    return
+                    
+                self.job_manager.stop_processing()
+            
+            # Reset all jobs to pending status (we'll need to add this method to job manager)
+            if hasattr(self.job_manager, 'reset_all_jobs'):
+                count = self.job_manager.reset_all_jobs()
+            else:
+                # Fallback: clear completed and reset progress tracking
+                count = 0
+                if hasattr(self.job_manager, 'progress_tracker'):
+                    self.job_manager.progress_tracker.reset_tracking()
+            
+            # Reset control button states
+            self.control_buttons['start'].config(state="normal")
+            self.control_buttons['pause'].config(state="disabled", text="Pause")
+            self.control_buttons['stop'].config(state="disabled")
+            
+            # Clear job tree display
+            if hasattr(self, 'job_tree'):
+                for item in self.job_tree.get_children():
+                    self.job_tree.delete(item)
+            
+            # Reset progress
+            if hasattr(self, 'overall_progress'):
+                self.overall_progress['value'] = 0
+            if hasattr(self, 'progress_text_var'):
+                self.progress_text_var.set("Ready to process")
+            if hasattr(self, 'queue_info_var'):
+                self.queue_info_var.set("Queue reset - ready to start")
+            
+            logger.info("Batch queue restarted by user")
+            messagebox.showinfo("Queue Restarted", "All jobs have been reset and are ready to process again.")
+            
+        except Exception as e:
+            logger.error(f"Error restarting queue: {e}")
+            show_error_with_logging(
+                self.root, "Restart Error",
+                f"Error restarting batch queue: {e}",
+                exception=e
+            )
+    
+    def on_processing_option_changed(self):
+        """Handle changes to processing options (checkboxes)."""
+        try:
+            # Save user preferences
+            self.user_config.set('enable_image_rendering', self.image_rendering_var.get())
+            self.user_config.set('enable_video_rendering', self.video_rendering_var.get())
+            
+            # Update status to show current settings
+            image_status = "✓" if self.image_rendering_var.get() else "✗"
+            video_status = "✓" if self.video_rendering_var.get() else "✗"
+            
+            logger.info(f"Processing options updated: Image {image_status}, Video {video_status}")
+            
+        except Exception as e:
+            logger.error(f"Error updating processing options: {e}")
     
     # Observer callbacks
     def on_queue_state_changed(self, summary: Dict[str, Any]):
