@@ -206,7 +206,21 @@ class STLProcessorGUI:
         # Initialize job manager
         if self.job_manager is None:
             try:
-                state_dir = Path.cwd() / "batch_queue_state"
+                # Use user data directory with write permissions
+                import tempfile
+                import os
+                
+                # Try user's local app data directory first
+                if os.name == 'nt':  # Windows
+                    state_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "batch_queue_state"
+                else:  # Unix/Linux/Mac
+                    state_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "batch_queue_state"
+                
+                # Fallback to temp directory if home directory fails
+                try:
+                    state_dir.parent.mkdir(parents=True, exist_ok=True)
+                except (OSError, PermissionError):
+                    state_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "batch_queue_state"
                 self.job_manager = EnhancedJobManager(
                     max_workers=2,
                     state_dir=state_dir,

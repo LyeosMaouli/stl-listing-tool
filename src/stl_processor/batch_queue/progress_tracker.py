@@ -330,6 +330,66 @@ class ProgressTracker:
         with self._lock:
             return [jp for jp in self._job_progress.values() if jp.is_active]
     
+    @property
+    def job_progress(self) -> Dict[str, Any]:
+        """Get job progress dictionary for recovery/serialization."""
+        with self._lock:
+            # Convert JobProgress objects to serializable dictionaries
+            serializable_progress = {}
+            for job_id, progress in self._job_progress.items():
+                try:
+                    serializable_progress[job_id] = {
+                        'job_id': progress.job_id,
+                        'job_type': progress.job_type,
+                        'stl_filename': progress.stl_filename,
+                        'state': progress.state.value if progress.state else 'pending',
+                        'progress': progress.progress,
+                        'current_step': progress.current_step,
+                        'steps_completed': progress.steps_completed,
+                        'total_steps': progress.total_steps,
+                        'started_at': progress.started_at.isoformat() if progress.started_at else None,
+                        'elapsed_time': progress.elapsed_time,
+                        'processing_speed': progress.processing_speed,
+                    }
+                except Exception as e:
+                    logger.warning(f"Could not serialize progress for job {job_id}: {e}")
+                    # Provide minimal fallback data
+                    serializable_progress[job_id] = {
+                        'job_id': job_id,
+                        'progress': 0.0,
+                        'state': 'pending'
+                    }
+            return serializable_progress
+    
+    @property 
+    def job_messages(self) -> Dict[str, str]:
+        """Get job messages dictionary for recovery/serialization."""
+        with self._lock:
+            # Extract current step messages from job progress
+            return {job_id: progress.current_step or "" 
+                    for job_id, progress in self._job_progress.items()}
+    
+    def get_overall_progress(self) -> float:
+        """Get overall progress percentage for recovery/serialization."""
+        with self._lock:
+            if self._queue_progress:
+                return self._queue_progress.overall_progress
+            return 0.0
+    
+    def reset_job_progress(self, job_id: str):
+        """Reset progress for a specific job (used by recovery manager)."""
+        with self._lock:
+            if job_id in self._job_progress:
+                job_progress = self._job_progress[job_id]
+                job_progress.progress = 0.0
+                job_progress.state = JobState.PENDING
+                job_progress.current_step = None
+                job_progress.started_at = None
+                job_progress.elapsed_time = None
+                logger.info(f"Reset progress for job {job_id}")
+                self._notify_job_observers(job_progress)
+                self._update_queue_progress()
+    
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics."""
         with self._lock:
