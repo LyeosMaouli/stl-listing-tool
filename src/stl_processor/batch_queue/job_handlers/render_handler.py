@@ -87,25 +87,42 @@ class RenderJobHandler(JobExecutor):
             if progress_callback:
                 progress_callback(10.0, "Loading STL file...")
             
-            # Load STL file
-            mesh_data = self.processor.load_stl(str(input_file))
-            if not mesh_data:
+            # Load STL file using processor for validation
+            success = self.processor.load(str(input_file))
+            if not success:
+                error_msg = "Failed to load STL file"
+                if self.processor.last_error:
+                    error_msg = f"Failed to load STL file: {self.processor.last_error}"
+                
                 return JobResult(
                     job_id=job.id,
                     success=False,
                     error=JobError(
                         code="STL_LOAD_FAILED",
-                        message="Failed to load STL file",
+                        message=error_msg,
                         details={"input_file": str(input_file)}
                     )
                 )
             
+            # Get the loaded mesh for reference (renderer will load directly)
+            mesh_data = self.processor.mesh
+            
             if progress_callback:
                 progress_callback(30.0, "Setting up renderer...")
             
-            # Set up renderer
+            # Set up renderer by loading the STL file directly
             try:
-                self.renderer.set_mesh(mesh_data)
+                success = self.renderer.setup_scene(input_file)
+                if not success:
+                    return JobResult(
+                        job_id=job.id,
+                        success=False,
+                        error=JobError(
+                            code="RENDERER_SETUP_FAILED",
+                            message="Failed to set up renderer scene",
+                            details={"input_file": str(input_file)}
+                        )
+                    )
             except Exception as e:
                 return JobResult(
                     job_id=job.id,
@@ -140,11 +157,20 @@ class RenderJobHandler(JobExecutor):
                 
                 # Render image
                 try:
-                    self.renderer.render_image(str(output_path), 
-                                             width=options.get("width", 1920),
-                                             height=options.get("height", 1080))
-                    generated_files.append(str(output_path))
-                    logger.info(f"Generated image: {output_path}")
+                    success = self.renderer.render(output_path)
+                    if success:
+                        generated_files.append(str(output_path))
+                        logger.info(f"Generated image: {output_path}")
+                    else:
+                        return JobResult(
+                            job_id=job.id,
+                            success=False,
+                            error=JobError(
+                                code="IMAGE_RENDER_FAILED",
+                                message="Failed to render image",
+                                details={"output_path": str(output_path)}
+                            )
+                        )
                 except Exception as e:
                     return JobResult(
                         job_id=job.id,
@@ -167,20 +193,25 @@ class RenderJobHandler(JobExecutor):
                 
                 try:
                     # Use video generator if available
-                    from ...generators.video_generator import RotationVideoGenerator
+                    from ...generators.video_generator import RotationVideoGenerator, VideoFormat, VideoQuality
                     video_gen = RotationVideoGenerator()
                     
                     # Set up video parameters
-                    duration = options.get("video_duration", 10.0)
-                    fps = options.get("video_fps", 30)
+                    duration = options.get("video_duration", 8.0)
                     
-                    # Generate rotation video
-                    video_gen.generate_rotation_video(
-                        mesh_data, str(video_path), 
-                        duration=duration, fps=fps
+                    # Generate rotation video using the renderer
+                    success = video_gen.generate_rotation_video(
+                        self.renderer, video_path, 
+                        video_format=VideoFormat.MP4,
+                        quality=VideoQuality.STANDARD,
+                        duration_seconds=duration
                     )
-                    generated_files.append(str(video_path))
-                    logger.info(f"Generated video: {video_path}")
+                    
+                    if success:
+                        generated_files.append(str(video_path))
+                        logger.info(f"Generated video: {video_path}")
+                    else:
+                        logger.warning(f"Video generation failed for {video_path}")
                     
                 except Exception as e:
                     logger.warning(f"Video generation failed: {e}")
