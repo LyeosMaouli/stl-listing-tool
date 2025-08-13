@@ -3,8 +3,7 @@ import numpy as np
 from typing import Dict, List, Union, Tuple, Optional
 from pathlib import Path
 
-from ..utils.logger import logger
-
+from utils.logger import logger
 
 class DimensionExtractor:
     """
