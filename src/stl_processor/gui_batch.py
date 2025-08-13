@@ -47,12 +47,54 @@ class BatchProcessingGUI(STLProcessorGUI):
     
     def setup_ui(self):
         """Override to add batch processing UI elements."""
-        self.create_menu()
+        self.create_enhanced_menu()  # Enhanced menu with queue options
         self.create_main_frame()
         self.create_mode_selector()  # New: Mode selector
         self.create_file_selection()
         self.create_notebook()
         self.create_status_bar()
+    
+    def create_enhanced_menu(self):
+        """Create enhanced menu with batch processing options."""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # File menu with batch options
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Open STL...", command=self.browse_file, accelerator="Ctrl+O")
+        file_menu.add_separator()
+        file_menu.add_command(label="Add Files to Queue...", command=self.add_files_to_queue, accelerator="Ctrl+Shift+A")
+        file_menu.add_command(label="Add Folder to Queue...", command=self.add_folder_to_queue, accelerator="Ctrl+Shift+F")
+        file_menu.add_separator()
+        file_menu.add_command(label="Clear Queue", command=self.clear_queue)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing, accelerator="Ctrl+Q")
+        
+        # Queue menu (new)
+        self.queue_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Queue", menu=self.queue_menu)
+        self.queue_menu.add_command(label="Start Processing", command=self.start_processing)
+        self.queue_menu.add_command(label="Pause All Jobs", command=self.pause_processing)
+        self.queue_menu.add_command(label="Resume All Jobs", command=self.resume_processing)
+        self.queue_menu.add_command(label="Stop All Jobs", command=self.stop_processing)
+        self.queue_menu.add_separator()
+        self.queue_menu.add_command(label="Clear Completed Jobs", command=self.clear_completed)
+        self.queue_menu.add_command(label="Retry Failed Jobs", command=self.retry_failed)
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Batch Processing Guide", command=self.show_batch_help)
+        help_menu.add_command(label="About", command=self.show_about)
+        
+        # Keyboard shortcuts
+        self.root.bind('<Control-o>', lambda e: self.browse_file())
+        self.root.bind('<Control-q>', lambda e: self.on_closing())
+        self.root.bind('<Control-Shift-A>', lambda e: self.add_files_to_queue())
+        self.root.bind('<Control-Shift-F>', lambda e: self.add_folder_to_queue())
+        self.root.bind('<space>', lambda e: self.toggle_pause_resume())
+        self.root.bind('<F5>', lambda e: self.refresh_queue_status())
     
     def create_mode_selector(self):
         """Create mode selector to toggle between single file and batch processing."""
@@ -529,6 +571,155 @@ class BatchProcessingGUI(STLProcessorGUI):
         # Schedule next update
         if self.batch_mode:
             self.update_timer = self.root.after(1000, self.update_gui)
+    
+    # Menu command methods
+    def add_files_to_queue(self):
+        """Add files to queue via file dialog."""
+        if not self.batch_mode:
+            self.mode_var.set("batch")
+            self.on_mode_change()
+        
+        filetypes = [
+            ("STL files", "*.stl"),
+            ("All files", "*.*")
+        ]
+        
+        files = filedialog.askopenfilenames(
+            title="Select STL files to add to queue",
+            filetypes=filetypes
+        )
+        
+        if files:
+            try:
+                stl_files = [Path(f) for f in files]
+                output_dir = Path.cwd() / "stl_processing_output"
+                output_dir.mkdir(exist_ok=True)
+                
+                if self.job_manager:
+                    job_ids = self.job_manager.add_jobs_from_files(
+                        stl_files, output_dir, job_type="render"
+                    )
+                    messagebox.showinfo(
+                        "Files Added", 
+                        f"Added {len(job_ids)} STL files to batch queue"
+                    )
+            except Exception as e:
+                show_error_with_logging(
+                    self.root, "Error Adding Files",
+                    f"Error adding files to queue: {e}",
+                    exception=e
+                )
+    
+    def add_folder_to_queue(self):
+        """Add folder to queue (same as existing browse_folder)."""
+        if not self.batch_mode:
+            self.mode_var.set("batch")
+            self.on_mode_change()
+        
+        self.browse_folder()
+    
+    def clear_queue(self):
+        """Clear all jobs from queue."""
+        if self.job_manager:
+            try:
+                count = self.job_manager.clear_all_jobs()
+                if count > 0:
+                    messagebox.showinfo("Queue Cleared", f"Removed {count} jobs from queue")
+                else:
+                    messagebox.showinfo("Queue Empty", "No jobs to clear")
+            except Exception as e:
+                show_error_with_logging(
+                    self.root, "Error Clearing Queue",
+                    f"Error clearing queue: {e}",
+                    exception=e
+                )
+    
+    def resume_processing(self):
+        """Resume paused processing."""
+        if self.job_manager and self.job_manager.is_paused:
+            try:
+                self.job_manager.resume_processing()
+                logger.info("Processing resumed from menu")
+            except Exception as e:
+                show_error_with_logging(
+                    self.root, "Error Resuming",
+                    f"Error resuming processing: {e}",
+                    exception=e
+                )
+    
+    def retry_failed(self):
+        """Retry failed jobs."""
+        if self.job_manager:
+            try:
+                # This would need to be implemented in the job manager
+                messagebox.showinfo("Not Implemented", "Retry failed jobs feature coming soon")
+            except Exception as e:
+                logger.error(f"Error retrying failed jobs: {e}")
+    
+    def show_batch_help(self):
+        """Show batch processing help dialog."""
+        help_text = """
+STL Listing Tool - Batch Processing Guide
+
+GETTING STARTED:
+1. Switch to Batch Processing mode using the radio button
+2. Add files: File → Add Files to Queue or Add Folder to Queue  
+3. Configure processing options in the Queue Setup tab
+4. Start processing: Queue → Start Processing
+
+QUEUE OPERATIONS:
+• Start/Pause/Stop: Control processing from Queue menu or buttons
+• Clear Completed: Remove finished jobs to keep queue clean
+• Job Status: View progress in the Batch Queue tab
+
+KEYBOARD SHORTCUTS:
+• Ctrl+Shift+A: Add files to queue
+• Ctrl+Shift+F: Add folder to queue
+• Space: Pause/Resume processing
+• F5: Refresh queue status
+
+OUTPUT ORGANIZATION:
+Each STL file gets its own subfolder with:
+• renders/ - Generated images and videos
+• analysis/ - Dimension and validation reports
+• logs/ - Processing logs and errors
+
+For more help, see the documentation or contact support.
+        """
+        
+        help_window = tk.Toplevel(self.root)
+        help_window.title("Batch Processing Guide")
+        help_window.geometry("600x500")
+        help_window.transient(self.root)
+        help_window.grab_set()
+        
+        text_widget = tk.Text(help_window, wrap=tk.WORD, padx=20, pady=20)
+        scrollbar = ttk.Scrollbar(help_window, orient="vertical", command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+        
+        text_widget.insert("1.0", help_text)
+        text_widget.config(state="disabled")
+        
+        text_widget.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+    
+    def toggle_pause_resume(self):
+        """Toggle between pause and resume (Space key)."""
+        if self.job_manager:
+            if self.job_manager.is_running:
+                if self.job_manager.is_paused:
+                    self.resume_processing()
+                else:
+                    self.pause_processing()
+    
+    def refresh_queue_status(self):
+        """Refresh queue display (F5 key)."""
+        if self.batch_mode and self.job_manager:
+            try:
+                summary = self.job_manager.get_queue_summary()
+                self._update_queue_display(summary)
+            except Exception as e:
+                logger.error(f"Error refreshing queue status: {e}")
     
     def on_closing(self):
         """Handle window closing."""
