@@ -29,12 +29,9 @@ class BatchProcessingGUI(STLProcessorGUI):
     def __init__(self, root):
         # Initialize job manager
         self.job_manager = None
-        self.batch_mode = False
         self.update_timer = None
         
         # Batch-specific UI components
-        self.mode_var = None
-        self.batch_frame = None
         self.job_tree = None
         self.progress_bars = {}
         self.control_buttons = {}
@@ -43,14 +40,16 @@ class BatchProcessingGUI(STLProcessorGUI):
         super().__init__(root)
         
         # Override title
-        self.root.title("STL Listing Tool")
+        self.root.title("STL Listing Tool - Batch Processing")
+        
+        # Always initialize batch mode
+        self.initialize_batch_mode()
     
     def setup_ui(self):
         """Override to add batch processing UI elements."""
         self.create_enhanced_menu()  # Enhanced menu with queue options
         self.create_main_frame()
-        self.create_mode_selector()  # New: Mode selector
-        self.create_file_selection()
+        self.create_drag_drop_area()  # Drag and drop for batch processing
         self.create_notebook()
         self.create_status_bar()
     
@@ -96,47 +95,40 @@ class BatchProcessingGUI(STLProcessorGUI):
         self.root.bind('<space>', lambda e: self.toggle_pause_resume())
         self.root.bind('<F5>', lambda e: self.refresh_queue_status())
     
-    def create_mode_selector(self):
-        """Create mode selector to toggle between single file and batch processing."""
-        mode_frame = ttk.LabelFrame(self.main_frame, text="Processing Mode", padding="10")
-        mode_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-        mode_frame.columnconfigure(1, weight=1)
+    def create_drag_drop_area(self):
+        """Create drag and drop area for batch processing."""
+        drop_frame = ttk.LabelFrame(self.main_frame, text="File Selection", padding="10")
+        drop_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        drop_frame.columnconfigure(0, weight=1)
         
-        self.mode_var = tk.StringVar(value="single")
+        # Create main drop area
+        self.drop_area = tk.Label(drop_frame, text="Drop STL files or folders here", 
+                                 bg="lightblue", fg="darkblue", 
+                                 border=2, relief="ridge", height=4,
+                                 font=('TkDefaultFont', 12, 'bold'))
+        self.drop_area.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        ttk.Radiobutton(
-            mode_frame, text="Single File Processing", 
-            variable=self.mode_var, value="single",
-            command=self.on_mode_change
-        ).grid(row=0, column=0, padx=(0, 20), sticky=tk.W)
+        # Button frame for browse options
+        button_frame = ttk.Frame(drop_frame)
+        button_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
         
-        ttk.Radiobutton(
-            mode_frame, text="Batch Processing", 
-            variable=self.mode_var, value="batch",
-            command=self.on_mode_change
-        ).grid(row=0, column=1, sticky=tk.W)
+        # Browse buttons
+        ttk.Button(button_frame, text="Browse Files...", 
+                  command=self.add_files_to_queue).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(button_frame, text="Browse Folder...", 
+                  command=self.add_folder_to_queue).grid(row=0, column=1)
         
-        # Info label
-        self.mode_info_var = tk.StringVar(value="Process one STL file at a time")
-        ttk.Label(mode_frame, textvariable=self.mode_info_var, 
-                 foreground="gray").grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        # Status display
+        self.file_status_var = tk.StringVar(value="Ready to process STL files")
+        ttk.Label(drop_frame, textvariable=self.file_status_var, 
+                 foreground="gray").grid(row=2, column=0, sticky=tk.W, pady=(10, 0))
+        
+        # Setup drag and drop functionality
+        self.setup_batch_drag_drop()
     
-    def on_mode_change(self):
-        """Handle mode change between single and batch processing."""
-        new_mode = self.mode_var.get()
-        
-        if new_mode == "batch" and not self.batch_mode:
-            self.switch_to_batch_mode()
-        elif new_mode == "single" and self.batch_mode:
-            self.switch_to_single_mode()
-    
-    def switch_to_batch_mode(self):
-        """Switch to batch processing mode."""
-        logger.info("Switching to batch processing mode")
-        self.batch_mode = True
-        
-        # Update mode info
-        self.mode_info_var.set("Process multiple STL files in a queue with advanced options")
+    def initialize_batch_mode(self):
+        """Initialize batch processing mode."""
+        logger.info("Initializing batch processing mode")
         
         # Initialize job manager
         if self.job_manager is None:
@@ -161,85 +153,105 @@ class BatchProcessingGUI(STLProcessorGUI):
                     f"Failed to initialize batch processing system: {e}",
                     exception=e
                 )
-                self.mode_var.set("single")
                 return
         
         # Add batch queue tab
         self.create_batch_queue_tab()
         
-        # Update file selection for batch mode
-        self.update_file_selection_for_batch()
-        
         # Start update timer
         self.start_update_timer()
     
-    def switch_to_single_mode(self):
-        """Switch to single file processing mode."""
-        logger.info("Switching to single file processing mode")
-        self.batch_mode = False
-        
-        # Update mode info
-        self.mode_info_var.set("Process one STL file at a time")
-        
-        # Stop update timer
-        self.stop_update_timer()
-        
-        # Remove batch queue tab if it exists
-        if hasattr(self, 'batch_tab'):
-            try:
-                self.notebook.forget(self.batch_tab)
-            except:
-                pass
-        
-        # Restore original file selection
-        self.update_file_selection_for_single()
-        
-        # Stop job manager if running
-        if self.job_manager and self.job_manager.is_running:
-            self.job_manager.stop_processing()
+    def setup_batch_drag_drop(self):
+        """Setup drag and drop functionality for batch processing."""
+        def on_drop(event):
+            files = self.root.tk.splitlist(event.data)
+            if files:
+                self.process_dropped_files(files)
+                
+        try:
+            from tkinterdnd2 import DND_FILES
+            self.drop_area.drop_target_register(DND_FILES)
+            self.drop_area.dnd_bind('<<Drop>>', on_drop)
+            self.dnd_available = True
+            logger.info("Drag-and-drop functionality enabled")
+
+        except ImportError:
+            self.dnd_available = False
+            logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            # Update drop area to show drag-and-drop is unavailable
+            self.drop_area.config(
+                text="Drag-and-drop unavailable\nUse Browse buttons instead",
+                bg="lightyellow",
+                fg="darkgray"
+            )
     
-    def create_file_selection(self):
-        """Override to support both single and batch file selection."""
-        file_frame = ttk.LabelFrame(self.main_frame, text="File Selection", padding="10")
-        file_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
-        file_frame.columnconfigure(1, weight=1)
-        
-        self.file_var = tk.StringVar(value="No file selected")
-        
-        # Create button frame
-        button_frame = ttk.Frame(file_frame)
-        button_frame.grid(row=0, column=0, padx=(0, 10))
-        
-        # Single file browse button
-        self.single_browse_btn = ttk.Button(button_frame, text="Browse File...", command=self.browse_file)
-        self.single_browse_btn.grid(row=0, column=0, pady=(0, 5))
-        
-        # Batch folder browse button
-        self.batch_browse_btn = ttk.Button(button_frame, text="Browse Folder...", command=self.browse_folder)
-        self.batch_browse_btn.grid(row=1, column=0)
-        
-        # File/folder display
-        file_label = ttk.Label(file_frame, textvariable=self.file_var, background="white", 
-                              relief="sunken", padding="5")
-        file_label.grid(row=0, column=1, sticky=(tk.W, tk.E))
-        
-        # Initially show single mode
-        self.update_file_selection_for_single()
+    def process_dropped_files(self, files):
+        """Process files/folders dropped onto the interface."""
+        try:
+            stl_files = []
+            folders = []
+            
+            for file_path_str in files:
+                file_path = Path(file_path_str)
+                
+                if file_path.is_file() and file_path.suffix.lower() == '.stl':
+                    stl_files.append(file_path)
+                elif file_path.is_dir():
+                    folders.append(file_path)
+                    # Recursively find STL files in folders
+                    stl_files.extend(list(file_path.rglob("*.stl")))
+            
+            if stl_files:
+                self.add_files_to_batch_queue(stl_files)
+            elif folders:
+                messagebox.showinfo("No STL Files", 
+                                   f"No STL files found in the dropped folders")
+            else:
+                messagebox.showwarning("Invalid Files", 
+                                      "Please drop STL files or folders containing STL files")
+                                      
+        except Exception as e:
+            logger.error(f"Error processing dropped files: {e}")
+            show_error_with_logging(
+                self.root, "Drop Error",
+                f"Error processing dropped files: {e}",
+                exception=e
+            )
     
-    def update_file_selection_for_single(self):
-        """Update file selection UI for single file mode."""
-        self.single_browse_btn.grid()
-        self.batch_browse_btn.grid_remove()
-        
-    def update_file_selection_for_batch(self):
-        """Update file selection UI for batch mode."""
-        self.single_browse_btn.grid_remove()
-        self.batch_browse_btn.grid()
+    def add_files_to_batch_queue(self, stl_files):
+        """Add STL files to the batch processing queue."""
+        try:
+            if not self.job_manager:
+                logger.error("Job manager not initialized")
+                return
+            
+            # Create output directory
+            output_dir = Path.cwd() / "stl_processing_output"
+            output_dir.mkdir(exist_ok=True)
+            
+            # Add jobs to queue
+            job_ids = self.job_manager.add_jobs_from_files(
+                stl_files, output_dir, job_type="render"
+            )
+            
+            logger.info(f"Added {len(job_ids)} jobs to queue")
+            
+            # Update status
+            self.file_status_var.set(f"Added {len(stl_files)} STL files to queue")
+            
+            messagebox.showinfo(
+                "Files Added", 
+                f"Added {len(stl_files)} STL files to batch queue"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error adding files to queue: {e}")
+            show_error_with_logging(
+                self.root, "Queue Error",
+                f"Error adding files to batch queue: {e}",
+                exception=e
+            )
     
-    def setup_drag_drop(self):
-        """Drag and drop disabled for this GUI."""
-        # Drag and drop functionality completely removed
-        pass
     
     def browse_folder(self):
         """Browse for folder containing STL files."""
@@ -260,24 +272,8 @@ class BatchProcessingGUI(STLProcessorGUI):
                 messagebox.showinfo("No STL Files", f"No STL files found in {folder_path}")
                 return
             
-            # Update file display
-            self.file_var.set(f"{folder_path} ({len(stl_files)} STL files found)")
-            
-            # Create output directory
-            output_dir = folder_path / "stl_processing_output"
-            output_dir.mkdir(exist_ok=True)
-            
-            # Add jobs to queue
-            if self.job_manager:
-                job_ids = self.job_manager.add_jobs_from_files(
-                    stl_files, output_dir, job_type="render"
-                )
-                logger.info(f"Added {len(job_ids)} jobs to queue")
-                
-                messagebox.showinfo(
-                    "Files Added", 
-                    f"Added {len(stl_files)} STL files to batch queue"
-                )
+            # Add files to queue
+            self.add_files_to_batch_queue(stl_files)
             
         except Exception as e:
             logger.error(f"Error loading batch folder: {e}")
@@ -389,9 +385,9 @@ class BatchProcessingGUI(STLProcessorGUI):
         )
     
     def create_notebook(self):
-        """Override to adjust grid position for mode selector."""
+        """Override to adjust grid position for drag-drop area."""
         self.notebook = ttk.Notebook(self.main_frame)
-        self.notebook.grid(row=2, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         self.create_analysis_tab()
         self.create_validation_tab() 
@@ -561,7 +557,7 @@ class BatchProcessingGUI(STLProcessorGUI):
     
     def update_gui(self):
         """Periodic GUI update."""
-        if self.batch_mode and self.job_manager:
+        if self.job_manager:
             try:
                 summary = self.job_manager.get_queue_summary()
                 self._update_queue_display(summary)
@@ -569,16 +565,11 @@ class BatchProcessingGUI(STLProcessorGUI):
                 logger.error(f"Error in periodic update: {e}")
         
         # Schedule next update
-        if self.batch_mode:
-            self.update_timer = self.root.after(1000, self.update_gui)
+        self.update_timer = self.root.after(1000, self.update_gui)
     
     # Menu command methods
     def add_files_to_queue(self):
         """Add files to queue via file dialog."""
-        if not self.batch_mode:
-            self.mode_var.set("batch")
-            self.on_mode_change()
-        
         filetypes = [
             ("STL files", "*.stl"),
             ("All files", "*.*")
@@ -592,17 +583,7 @@ class BatchProcessingGUI(STLProcessorGUI):
         if files:
             try:
                 stl_files = [Path(f) for f in files]
-                output_dir = Path.cwd() / "stl_processing_output"
-                output_dir.mkdir(exist_ok=True)
-                
-                if self.job_manager:
-                    job_ids = self.job_manager.add_jobs_from_files(
-                        stl_files, output_dir, job_type="render"
-                    )
-                    messagebox.showinfo(
-                        "Files Added", 
-                        f"Added {len(job_ids)} STL files to batch queue"
-                    )
+                self.add_files_to_batch_queue(stl_files)
             except Exception as e:
                 show_error_with_logging(
                     self.root, "Error Adding Files",
@@ -612,10 +593,6 @@ class BatchProcessingGUI(STLProcessorGUI):
     
     def add_folder_to_queue(self):
         """Add folder to queue (same as existing browse_folder)."""
-        if not self.batch_mode:
-            self.mode_var.set("batch")
-            self.on_mode_change()
-        
         self.browse_folder()
     
     def clear_queue(self):
@@ -714,7 +691,7 @@ For more help, see the documentation or contact support.
     
     def refresh_queue_status(self):
         """Refresh queue display (F5 key)."""
-        if self.batch_mode and self.job_manager:
+        if self.job_manager:
             try:
                 summary = self.job_manager.get_queue_summary()
                 self._update_queue_display(summary)
