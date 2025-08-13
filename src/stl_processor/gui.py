@@ -547,14 +547,28 @@ class STLProcessorGUI:
                     )
                     
         try:
-            from tkinterdnd2 import DND_FILES
+            from tkinterdnd2 import DND_FILES, TkinterDnD
+            
+            # Try to initialize tkinterdnd2 properly
+            try:
+                # Make sure the root window is ready for DnD
+                TkinterDnD.TkinterDnD(self.root)._init()
+            except:
+                # If that fails, try the direct approach
+                pass
+            
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
             self.dnd_available = True
 
-        except ImportError:
+        except (ImportError, Exception) as e:
             self.dnd_available = False
-            logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            if isinstance(e, ImportError):
+                logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")
+            else:
+                logger.warning(f"Drag-and-drop initialization failed: {e}")
+                logger.info("This is common on some Windows systems. Using browse button instead.")
+            
             # Update drop area to show drag-and-drop is unavailable
             self.drop_area.config(
                 text="Drag-and-drop unavailable\nUse Browse button instead",
@@ -1404,7 +1418,8 @@ def main():
     try:
         from tkinterdnd2 import TkinterDnD
         root = TkinterDnD.Tk()
-    except ImportError:
+    except (ImportError, Exception):
+        # Fallback to regular Tk if TkinterDnD fails
         root = tk.Tk()
         
     app = STLProcessorGUI(root)
