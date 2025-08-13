@@ -16,7 +16,7 @@ logger = setup_logger("user_config")
 class UserConfig:
     """Manages user configuration persistence in platform-appropriate directories."""
     
-    def __init__(self, app_name: str = "stl_listing_tools"):
+    def __init__(self, app_name: str = "stl_listing_tool"):
         self.app_name = app_name
         self.config_file = "config.json"
         self._config_data = {}
@@ -30,7 +30,7 @@ class UserConfig:
         system = platform.system().lower()
         
         if system == "windows":
-            # Use APPDATA/Local for Windows (like C:\Users\user\AppData\Local\stl_listing_tools)
+            # Use APPDATA/Local for Windows (like C:\Users\user\AppData\Local\stl_listing_tool)
             base_dir = os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local"))
         elif system == "darwin":  # macOS
             # Use ~/Library/Application Support for macOS

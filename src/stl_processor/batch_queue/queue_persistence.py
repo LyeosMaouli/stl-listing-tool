@@ -32,12 +32,12 @@ class QueueStateManager:
         Initialize queue state manager.
         
         Args:
-            state_file: Path to state file (default: ~/.local/stl_listing_tools/queue_state.json)
+            state_file: Path to state file (default: ~/.local/stl_listing_tool/queue_state.json)
             max_backups: Maximum number of backup files to keep
         """
         if state_file is None:
             # Default location
-            config_dir = Path.home() / ".local" / "stl_listing_tools"
+            config_dir = Path.home() / ".local" / "stl_listing_tool"
             config_dir.mkdir(parents=True, exist_ok=True)
             state_file = config_dir / "queue_state.json"
         
@@ -331,7 +331,7 @@ class QueueConfiguration:
     def __init__(self, config_dir: Optional[Path] = None):
         """Initialize configuration manager."""
         if config_dir is None:
-            config_dir = Path.home() / ".local" / "stl_listing_tools" / "templates"
+            config_dir = Path.home() / ".local" / "stl_listing_tool" / "templates"
         
         self.config_dir = config_dir
         self.config_dir.mkdir(parents=True, exist_ok=True)

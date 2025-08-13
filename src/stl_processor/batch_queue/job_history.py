@@ -94,10 +94,10 @@ class JobHistoryManager:
         Initialize job history manager.
         
         Args:
-            db_path: Path to SQLite database file (default: ~/.local/stl_listing_tools/job_history.db)
+            db_path: Path to SQLite database file (default: ~/.local/stl_listing_tool/job_history.db)
         """
         if db_path is None:
-            config_dir = Path.home() / ".local" / "stl_listing_tools"
+            config_dir = Path.home() / ".local" / "stl_listing_tool"
             config_dir.mkdir(parents=True, exist_ok=True)
             db_path = config_dir / "job_history.db"
         
