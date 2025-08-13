@@ -6,7 +6,6 @@ from pathlib import Path
 
 from utils.logger import logger
 
-
 class ValidationLevel(Enum):
     """Validation strictness levels."""
     BASIC = "basic"

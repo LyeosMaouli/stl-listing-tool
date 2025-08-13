@@ -39,6 +39,24 @@ The project has core functionality implemented with **critical deployment issues
   - `src/cli.py`: Click-based CLI interface
   - `src/user_config.py`: Cross-platform user settings persistence
 
+- ✅ **Batch Processing System** (`src/batch_queue/`)
+  - `enhanced_job_manager.py`: Complete batch processing management with execution engine
+  - `job_executor.py`: Multi-threaded job execution with pause/resume capabilities
+  - `job_handlers/`: Specialized handlers for render, validation, and analysis jobs
+  - `error_handler.py`: Intelligent error classification and recovery strategies
+  - `recovery_manager.py`: Session recovery from unexpected shutdowns
+  - `progress_tracker.py`: Real-time progress tracking with observer patterns
+
+- ✅ **Unified GUI** (`src/gui_batch.py`)
+  - Single GUI application for all STL processing needs
+  - Mode toggle between single file and batch processing
+  - Enhanced file selection with browse buttons for files and folders
+  - Real-time batch queue management with job list display
+  - Queue control buttons (start/pause/stop/clear)
+  - Progress visualization with overall and per-job tracking
+  - Observer pattern integration for non-blocking UI updates
+  - Drag-and-drop functionality removed for better cross-platform compatibility
+
 - ✅ **Testing & Packaging**
   - `tests/`: Comprehensive test suite with fixtures
   - `setup.py`: Package configuration with entry points
@@ -66,7 +84,7 @@ pip install -r requirements-minimal.txt
 **Installation Notes**:
 - Console commands (stl-processor, stl-gui) now work correctly
 - Import system uses proper package structure
-- GUI gracefully handles missing tkinterdnd2 dependency
+- GUI no longer requires drag-and-drop dependencies
 - Configuration system uses modern Pydantic v2 API
 
 **Troubleshooting Installation:**
@@ -105,6 +123,15 @@ stl-processor render model.stl output.png --material plastic --lighting studio
 
 # Calculate scale information
 stl-processor scale model.stl --height 28
+
+# GUI Applications
+stl-gui                    # Launch main GUI (supports single file and batch processing)
+
+# Batch processing (Phase 2 - NEW)
+stl-processor batch process-folder ./models/ ./output/ --job-type render
+stl-processor batch list-jobs
+stl-processor batch start-processing
+stl-processor batch pause-processing
 ```
 
 

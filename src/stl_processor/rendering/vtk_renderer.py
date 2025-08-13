@@ -12,7 +12,6 @@ except ImportError:
 from rendering.base_renderer import BaseRenderer, MaterialType, LightingPreset, RenderQuality
 from utils.logger import logger
 
-
 class VTKRenderer(BaseRenderer):
     """
     VTK-based renderer for quick STL visualization and rendering.

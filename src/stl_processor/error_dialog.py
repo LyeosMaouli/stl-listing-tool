@@ -15,7 +15,6 @@ except ImportError:
 
 from utils.logger import logger
 
-
 class ComprehensiveErrorDialog:
     """
     A comprehensive error dialog that provides detailed error information,

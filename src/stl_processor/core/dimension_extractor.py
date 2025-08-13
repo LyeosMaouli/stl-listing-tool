@@ -5,7 +5,6 @@ from pathlib import Path
 
 from utils.logger import logger
 
-
 class DimensionExtractor:
     """
     Advanced dimension extraction and analysis for STL meshes.

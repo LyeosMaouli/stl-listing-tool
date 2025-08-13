@@ -111,7 +111,6 @@ class ColorVariationDialog:
     def cancel(self):
         self.dialog.destroy()
 
-
 def show_error_with_logging(parent, title, message, exception=None, context=None):
     """Wrapper for show_comprehensive_error that adds debugging logs and fixes image path bugs."""
     logger.info(f"=== ERROR DIALOG CALLED ===")
@@ -302,6 +301,7 @@ class STLProcessorGUI:
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""
         temp_dir = Path(tempfile.gettempdir())
+
         # Ensure the temp directory exists
         temp_dir.mkdir(parents=True, exist_ok=True)
         
@@ -551,6 +551,7 @@ class STLProcessorGUI:
             self.drop_area.drop_target_register(DND_FILES)
             self.drop_area.dnd_bind('<<Drop>>', on_drop)
             self.dnd_available = True
+
         except ImportError:
             self.dnd_available = False
             logger.warning("Drag-and-drop not available. Install tkinterdnd2 for full GUI functionality.")

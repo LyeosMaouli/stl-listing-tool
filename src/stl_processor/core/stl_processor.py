@@ -5,7 +5,6 @@ import numpy as np
 
 from utils.logger import logger
 
-
 class STLProcessor:
     """
     Core STL file processor for loading, validating, and extracting information from STL files.

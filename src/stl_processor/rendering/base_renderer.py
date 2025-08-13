@@ -11,7 +11,6 @@ except ImportError:
 
 from utils.logger import logger
 
-
 class MaterialType(Enum):
     """Material preset types."""
     PLASTIC = "plastic"
