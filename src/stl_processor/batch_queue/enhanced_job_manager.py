@@ -63,8 +63,24 @@ class EnhancedJobManager:
         # Job futures for tracking execution
         self._job_futures: Dict[str, Future] = {}
         
-        # State management
-        self.state_dir = Path(state_dir) if state_dir else Path.cwd() / "queue_state"
+        # State management - use user data directory for state if no state_dir provided
+        if state_dir:
+            self.state_dir = Path(state_dir)
+        else:
+            import tempfile
+            import os
+            
+            if os.name == 'nt':  # Windows
+                self.state_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "queue_state"
+            else:  # Unix/Linux/Mac
+                self.state_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "queue_state"
+            
+            # Fallback to temp directory if home directory fails
+            try:
+                self.state_dir.parent.mkdir(parents=True, exist_ok=True)
+            except (OSError, PermissionError):
+                self.state_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "queue_state"
+        
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.auto_save = auto_save
         

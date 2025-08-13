@@ -313,11 +313,12 @@ class SessionRecoveryManager:
             
             progress_data = self._load_json(self.progress_file)
             
-            # Restore progress data
-            self.progress_tracker.job_progress.update(progress_data.get("job_progress", {}))
-            self.progress_tracker.job_messages.update(progress_data.get("job_messages", {}))
-            
-            logger.info("Recovered progress tracker state")
+            # Restore progress data using the new method
+            success = self.progress_tracker.restore_progress_state(progress_data)
+            if success:
+                logger.info("Recovered progress tracker state")
+            else:
+                logger.warning("Partial recovery of progress tracker state")
             return True
             
         except Exception as e:

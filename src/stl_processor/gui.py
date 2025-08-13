@@ -553,9 +553,21 @@ class STLProcessorGUI:
                 logger.error("Job manager not initialized")
                 return
             
-            # Create output directory
-            output_dir = Path.cwd() / "stl_processing_output"
-            output_dir.mkdir(exist_ok=True)
+            # Create output directory in user data location
+            import tempfile
+            import os
+            
+            if os.name == 'nt':  # Windows
+                output_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "stl_processing_output"
+            else:  # Unix/Linux/Mac
+                output_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "stl_processing_output"
+            
+            # Fallback to temp directory if home directory fails
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+            except (OSError, PermissionError):
+                output_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
+                output_dir.mkdir(parents=True, exist_ok=True)
             
             # Add jobs to queue
             job_ids = self.job_manager.add_jobs_from_files(

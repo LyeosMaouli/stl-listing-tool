@@ -353,7 +353,14 @@ def list_jobs():
         from .batch_queue.enhanced_job_manager import EnhancedJobManager
         
         # Try to connect to existing job manager state
-        state_dir = Path.cwd() / "batch_state"
+        # Use user data directory for state
+        import tempfile
+        import os
+        
+        if os.name == 'nt':  # Windows
+            state_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "batch_state"
+        else:  # Unix/Linux/Mac
+            state_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "batch_state"
         if not state_dir.exists():
             click.echo("No batch queue state found")
             return
@@ -387,7 +394,14 @@ def start_processing():
     try:
         from .batch_queue.enhanced_job_manager import EnhancedJobManager
         
-        state_dir = Path.cwd() / "batch_state"
+        # Use user data directory for state
+        import tempfile
+        import os
+        
+        if os.name == 'nt':  # Windows
+            state_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "batch_state"
+        else:  # Unix/Linux/Mac
+            state_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "batch_state"
         if not state_dir.exists():
             click.echo("No batch queue found")
             return
@@ -416,7 +430,14 @@ def pause_processing():
     try:
         from .batch_queue.enhanced_job_manager import EnhancedJobManager
         
-        state_dir = Path.cwd() / "batch_state"
+        # Use user data directory for state
+        import tempfile
+        import os
+        
+        if os.name == 'nt':  # Windows
+            state_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "batch_state"
+        else:  # Unix/Linux/Mac
+            state_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "batch_state"
         if not state_dir.exists():
             click.echo("No batch queue found")
             return

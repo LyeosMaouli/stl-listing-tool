@@ -390,6 +390,64 @@ class ProgressTracker:
                 self._notify_job_observers(job_progress)
                 self._update_queue_progress()
     
+    def restore_progress_state(self, progress_data: Dict[str, Any]) -> bool:
+        """Restore progress tracker state from serialized data (used by recovery manager)."""
+        try:
+            with self._lock:
+                # Clear existing progress
+                self._job_progress.clear()
+                
+                # Restore job progress data
+                job_progress_data = progress_data.get("job_progress", {})
+                for job_id, job_data in job_progress_data.items():
+                    try:
+                        # Convert serialized data back to JobProgress object
+                        from datetime import datetime
+                        
+                        job_progress = JobProgress(
+                            job_id=job_data.get('job_id', job_id),
+                            job_type=job_data.get('job_type', 'render'),
+                            stl_filename=job_data.get('stl_filename', ''),
+                            state=JobState(job_data.get('state', 'pending')),
+                            progress=job_data.get('progress', 0.0),
+                            current_step=job_data.get('current_step'),
+                            steps_completed=job_data.get('steps_completed', 0),
+                            total_steps=job_data.get('total_steps', 1),
+                            elapsed_time=job_data.get('elapsed_time'),
+                            processing_speed=job_data.get('processing_speed')
+                        )
+                        
+                        # Parse datetime if provided
+                        started_at_str = job_data.get('started_at')
+                        if started_at_str:
+                            try:
+                                job_progress.started_at = datetime.fromisoformat(started_at_str)
+                            except:
+                                pass  # Ignore datetime parsing errors
+                        
+                        self._job_progress[job_id] = job_progress
+                        
+                    except Exception as e:
+                        logger.warning(f"Could not restore progress for job {job_id}: {e}")
+                        # Create minimal fallback progress
+                        self._job_progress[job_id] = JobProgress(
+                            job_id=job_id,
+                            job_type='render',
+                            stl_filename='',
+                            state=JobState.PENDING,
+                            progress=0.0
+                        )
+                
+                # Update queue progress
+                self._update_queue_progress()
+                
+                logger.info(f"Restored progress for {len(self._job_progress)} jobs")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to restore progress state: {e}")
+            return False
+    
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics."""
         with self._lock:
