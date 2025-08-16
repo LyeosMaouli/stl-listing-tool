@@ -61,19 +61,32 @@ class OpenCVVideoGenerator:
             
             self._update_progress(5, f"Generating {frame_count} frames...")
             
+            # Calculate camera positions for rotation
+            radius = 5.0  # Distance from center
+            
             # Generate rotation frames
             for i in range(frame_count):
                 angle = (i / frame_count) * 360
                 progress = 5 + (i / frame_count) * 80  # 5% to 85%
                 self._update_progress(progress, f"Rendering frame {i+1}/{frame_count} (angle: {angle:.1f}°)")
                 
-                # Set rotation
+                # Calculate camera position for rotation around Y axis
+                angle_rad = np.radians(angle)
                 if axis.lower() == 'y':
-                    renderer.set_camera_position(angle=angle)
+                    position = (radius * np.sin(angle_rad), 0, radius * np.cos(angle_rad))
+                elif axis.lower() == 'x':
+                    position = (0, radius * np.sin(angle_rad), radius * np.cos(angle_rad))
+                else:  # z axis
+                    position = (radius * np.cos(angle_rad), radius * np.sin(angle_rad), 0)
+                
+                # Set camera position
+                success = renderer.set_camera(position, target=(0, 0, 0), up=(0, 1, 0))
+                if not success:
+                    raise RuntimeError(f"Failed to set camera for frame {i}")
                 
                 # Render frame
                 frame_path = self.temp_dir / f"frame_{i:06d}.png"
-                success = renderer.render_to_file(str(frame_path))
+                success = renderer.render(frame_path)
                 if not success:
                     raise RuntimeError(f"Failed to render frame {i}")
                     

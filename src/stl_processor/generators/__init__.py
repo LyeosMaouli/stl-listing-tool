@@ -6,6 +6,9 @@ from .video_generator import (
     VideoFormat,
     VideoQuality
 )
+from .opencv_video_generator import (
+    OpenCVVideoGenerator
+)
 from .image_generator import (
     ColorVariationGenerator,
     SizeComparisonGenerator, 
@@ -17,6 +20,7 @@ from .image_generator import (
 __all__ = [
     'RotationVideoGenerator',
     'MultiAngleVideoGenerator', 
+    'OpenCVVideoGenerator',
     'ColorVariationGenerator',
     'SizeComparisonGenerator',
     'VideoFormat',

@@ -2127,7 +2127,7 @@ class STLProcessorGUI:
                     
                     # Try OpenCV alternative
                     try:
-                        from ..generators.opencv_video_generator import OpenCVVideoGenerator
+                        from .generators.opencv_video_generator import OpenCVVideoGenerator
                         generator = OpenCVVideoGenerator()
                         self.log_generator_message("✅ Using OpenCV video generator")
                     except ImportError:
