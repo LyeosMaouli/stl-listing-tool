@@ -29,10 +29,17 @@ except ImportError as initial_error:
     MOVIEPY_AVAILABLE = False
 
 # Import PIL with fallback
+PIL_AVAILABLE = False
+Image = None
+ImageDraw = None
+ImageFont = None
+
 try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
-except ImportError:
+except ImportError as pil_error:
+    # Store the initial error for debugging
+    _PIL_IMPORT_ERROR = pil_error
     PIL_AVAILABLE = False
 
 logger = setup_logger("video_generator")
@@ -94,17 +101,25 @@ class RotationVideoGenerator:
         if not PIL_AVAILABLE:
             # Try to import again to get more detailed error info
             try:
-                from PIL import Image
-                # If this succeeds, update the flag
-                global PIL_AVAILABLE
-                PIL_AVAILABLE = True
+                from PIL import Image, ImageDraw, ImageFont
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.PIL_AVAILABLE = True
+                current_module.Image = Image
+                current_module.ImageDraw = ImageDraw
+                current_module.ImageFont = ImageFont
             except ImportError as e:
                 import sys
+                # Get the original error if available
+                original_error = globals().get('_PIL_IMPORT_ERROR', e)
                 error_msg = (
                     f"Pillow is required for image processing but import failed.\n"
-                    f"Error: {e}\n"
+                    f"Original error: {original_error}\n"
+                    f"Retry error: {e}\n"
                     f"Python executable: {sys.executable}\n"
-                    f"Please install with: pip install Pillow"
+                    f"Please install with: pip install Pillow\n"
+                    f"If already installed, check your Python environment."
                 )
                 raise ImportError(error_msg)
     
