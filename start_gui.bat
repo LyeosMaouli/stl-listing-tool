@@ -54,7 +54,7 @@ if errorlevel 1 (
 
 REM Check moviepy specifically
 echo 🎬 Checking moviepy...
-python -c "import moviepy" 2>nul
+python -c "from moviepy.editor import ImageSequenceClip" 2>nul
 if errorlevel 1 (
     echo 📥 Installing moviepy...
     python -m pip install moviepy
