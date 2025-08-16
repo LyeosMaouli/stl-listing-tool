@@ -635,11 +635,18 @@ class STLProcessorGUI:
         if not self.job_manager:
             return None
         
-        # Get pending jobs
-        pending_jobs = [job for job in self.job_manager.jobs.values() if job.status == 'pending']
-        if pending_jobs:
-            return pending_jobs[0]
-        return None
+        try:
+            # Import JobStatus for comparison
+            from .batch_queue.job_types_v2 import JobStatus
+            
+            # Get pending jobs
+            pending_jobs = [job for job in self.job_manager.jobs.values() if job.status == JobStatus.PENDING]
+            if pending_jobs:
+                return pending_jobs[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting first queue item: {e}")
+            return None
     
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""

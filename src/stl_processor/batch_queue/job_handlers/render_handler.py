@@ -59,6 +59,10 @@ class RenderJobHandler(JobExecutor):
     
     def _execute_with_lock(self, job: Job, progress_callback: Optional[Callable], start_time: float) -> JobResult:
         """Execute render job with VTK lock held."""
+        logger.info(f"Starting render job execution for job {job.id}")
+        logger.info(f"RENDERING_AVAILABLE = {RENDERING_AVAILABLE}")
+        logger.info(f"self.processor = {self.processor}")
+        
         if not RENDERING_AVAILABLE:
             return JobResult(
                 job_id=job.id,
@@ -70,14 +74,14 @@ class RenderJobHandler(JobExecutor):
                 )
             )
         
-        if not self.processor or not self.renderer:
+        if not self.processor:
             return JobResult(
                 job_id=job.id,
                 success=False,
                 error=JobError(
                     code="COMPONENTS_NOT_INITIALIZED",
-                    message="Rendering components could not be initialized",
-                    details={"processor": self.processor is not None, "renderer": self.renderer is not None}
+                    message="STL processor could not be initialized",
+                    details={"processor": self.processor is not None}
                 )
             )
         
@@ -122,6 +126,7 @@ class RenderJobHandler(JobExecutor):
                 progress_callback(30.0, "Setting up renderer...")
             
             # Create renderer with job-specific dimensions
+            logger.info(f"Creating VTK renderer with dimensions {image_width}x{image_height}")
             self.renderer = VTKRenderer(image_width, image_height)
             
             # Set up renderer by loading the STL file directly
@@ -171,6 +176,8 @@ class RenderJobHandler(JobExecutor):
             generate_image = options.get("image_rendering", options.get("generate_image", True))
             generate_video = options.get("video_rendering", options.get("generate_video", False))
             
+            logger.info(f"Job {job.id} options: generate_image={generate_image}, generate_video={generate_video}")
+            
             # Apply rendering parameters
             material = options.get("material", "plastic")
             lighting = options.get("lighting", "studio")
@@ -183,6 +190,7 @@ class RenderJobHandler(JobExecutor):
             generated_files = []
             
             if generate_image:
+                logger.info(f"Starting image generation for job {job.id}")
                 if progress_callback:
                     progress_callback(60.0, "Rendering image...")
                 
