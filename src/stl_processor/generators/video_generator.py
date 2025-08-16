@@ -67,11 +67,14 @@ class RotationVideoGenerator:
         if not MOVIEPY_AVAILABLE:
             # Try to import again to get more detailed error info
             try:
-                from moviepy.editor import ImageSequenceClip as _test_import
-                # If this succeeds, update the global imports
-                global MOVIEPY_AVAILABLE, ImageSequenceClip, clips_array, concatenate_videoclips
                 from moviepy.editor import ImageSequenceClip, clips_array, concatenate_videoclips
-                MOVIEPY_AVAILABLE = True
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.MOVIEPY_AVAILABLE = True
+                current_module.ImageSequenceClip = ImageSequenceClip
+                current_module.clips_array = clips_array
+                current_module.concatenate_videoclips = concatenate_videoclips
                 logger.info("Successfully imported moviepy on retry")
             except ImportError as e:
                 import sys
