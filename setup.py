@@ -18,11 +18,9 @@ else:
         'vtk>=9.2.0',
         'moviepy>=1.0.3',
         'Pillow>=10.0.0',
-        'rq>=1.15.0',
-        'redis>=4.5.0',
-        'SQLAlchemy>=2.0.0',
         'click>=8.1.0',
         'pydantic>=2.0.0',
+        'tkinterdnd2>=0.3.0',
         'pytest>=7.4.0',
         'numpy>=1.21.0'
     ]

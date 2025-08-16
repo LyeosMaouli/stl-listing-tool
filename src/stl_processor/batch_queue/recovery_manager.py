@@ -6,6 +6,9 @@ Handles recovery from unexpected shutdowns and system crashes.
 import logging
 import json
 import time
+import threading
+import tempfile
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import asdict
@@ -28,10 +31,20 @@ class SessionRecoveryManager:
                  job_queue: Optional[JobQueue] = None,
                  progress_tracker: Optional[ProgressTracker] = None):
         self.recovery_dir = Path(recovery_dir)
-        self.recovery_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create recovery directory with fallback to temp directory
+        try:
+            self.recovery_dir.mkdir(parents=True, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            logger.warning(f"Cannot create recovery directory {recovery_dir}: {e}, using temp directory")
+            self.recovery_dir = Path(tempfile.gettempdir()) / "stl_tool_recovery"
+            self.recovery_dir.mkdir(parents=True, exist_ok=True)
         
         self.job_queue = job_queue
         self.progress_tracker = progress_tracker
+        
+        # Thread safety lock
+        self._lock = threading.RLock()
         
         # Recovery files
         self.session_file = self.recovery_dir / "session.json"
@@ -63,38 +76,39 @@ class SessionRecoveryManager:
     
     def checkpoint(self) -> None:
         """Create a recovery checkpoint."""
-        if not self.session_id:
-            logger.warning("Cannot checkpoint: no active session")
-            return
-        
-        try:
-            current_time = time.time()
+        with self._lock:
+            if not self.session_id:
+                logger.warning("Cannot checkpoint: no active session")
+                return
             
-            # Save session state
-            self._save_session_state()
-            
-            # Save job queue state
-            if self.job_queue:
-                self._save_job_queue_state()
-            
-            # Save progress tracker state
-            if self.progress_tracker:
-                self._save_progress_state()
-            
-            # Update metadata
-            metadata = {
-                "session_id": self.session_id,
-                "start_time": self.session_start_time,
-                "last_checkpoint": current_time,
-                "version": "1.0"
-            }
-            self._save_json(self.metadata_file, metadata)
-            
-            self.last_checkpoint = current_time
-            logger.debug(f"Created checkpoint for session: {self.session_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create checkpoint: {e}")
+            try:
+                current_time = time.time()
+                
+                # Save session state
+                self._save_session_state()
+                
+                # Save job queue state
+                if self.job_queue:
+                    self._save_job_queue_state()
+                
+                # Save progress tracker state
+                if self.progress_tracker:
+                    self._save_progress_state()
+                
+                # Update metadata
+                metadata = {
+                    "session_id": self.session_id,
+                    "start_time": self.session_start_time,
+                    "last_checkpoint": current_time,
+                    "version": "1.0"
+                }
+                self._save_json(self.metadata_file, metadata)
+                
+                self.last_checkpoint = current_time
+                logger.debug(f"Created checkpoint for session: {self.session_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create checkpoint: {e}")
     
     def can_recover(self) -> bool:
         """Check if recovery data is available."""
@@ -355,9 +369,12 @@ class SessionRecoveryManager:
     
     def _save_json(self, file_path: Path, data: Dict[str, Any]) -> None:
         """Save data to JSON file with atomic write."""
+        # Use a unique temporary file name to avoid conflicts
+        temp_file = file_path.with_suffix(f'.tmp.{os.getpid()}.{int(time.time() * 1000000)}')
+        
         try:
-            # Write to temporary file first
-            temp_file = file_path.with_suffix('.tmp')
+            # Ensure parent directory exists
+            file_path.parent.mkdir(parents=True, exist_ok=True)
             
             with open(temp_file, 'w') as f:
                 json.dump(data, f, indent=2, default=str)
@@ -366,8 +383,14 @@ class SessionRecoveryManager:
             temp_file.replace(file_path)
             
         except Exception as e:
+            # Clean up temp file if it exists
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except:
+                    pass
             logger.error(f"Failed to save JSON to {file_path}: {e}")
-            raise
+            # Don't re-raise to prevent cascade failures
     
     def _load_json(self, file_path: Path) -> Dict[str, Any]:
         """Load data from JSON file."""
