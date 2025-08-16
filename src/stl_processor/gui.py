@@ -640,7 +640,7 @@ class STLProcessorGUI:
             from .batch_queue.job_types_v2 import JobStatus
             
             # Get pending jobs
-            pending_jobs = [job for job in self.job_manager.jobs.values() if job.status == JobStatus.PENDING]
+            pending_jobs = [job for job in self.job_manager._jobs.values() if job.status == JobStatus.PENDING]
             if pending_jobs:
                 return pending_jobs[0]
             return None

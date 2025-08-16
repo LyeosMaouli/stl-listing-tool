@@ -122,6 +122,22 @@ class RenderJobHandler(JobExecutor):
             # Get the loaded mesh for reference (renderer will load directly)
             mesh_data = self.processor.mesh
             
+            # Extract options from job first
+            options = job.options or {}
+            generate_image = options.get("image_rendering", options.get("generate_image", True))
+            generate_video = options.get("video_rendering", options.get("generate_video", False))
+            
+            # Apply rendering parameters
+            material = options.get("material", "plastic")
+            lighting = options.get("lighting", "studio")
+            image_width = options.get("image_width", 1920)
+            image_height = options.get("image_height", 1080)
+            video_format = options.get("video_format", "mp4")
+            video_quality = options.get("video_quality", "standard") 
+            video_duration = options.get("video_duration", 8.0)
+            
+            logger.info(f"Job {job.id} options: generate_image={generate_image}, generate_video={generate_video}")
+            
             if progress_callback:
                 progress_callback(30.0, "Setting up renderer...")
             
@@ -170,22 +186,6 @@ class RenderJobHandler(JobExecutor):
                         details={"input_file": str(input_file)}
                     )
                 )
-            
-            # Extract options from job
-            options = job.options or {}
-            generate_image = options.get("image_rendering", options.get("generate_image", True))
-            generate_video = options.get("video_rendering", options.get("generate_video", False))
-            
-            logger.info(f"Job {job.id} options: generate_image={generate_image}, generate_video={generate_video}")
-            
-            # Apply rendering parameters
-            material = options.get("material", "plastic")
-            lighting = options.get("lighting", "studio")
-            image_width = options.get("image_width", 1920)
-            image_height = options.get("image_height", 1080)
-            video_format = options.get("video_format", "mp4")
-            video_quality = options.get("video_quality", "standard") 
-            video_duration = options.get("video_duration", 8.0)
             
             generated_files = []
             
