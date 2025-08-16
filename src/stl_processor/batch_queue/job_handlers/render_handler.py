@@ -4,6 +4,7 @@ Render job handler for generating images and videos from STL files.
 
 import logging
 import time
+import threading
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
 
@@ -24,6 +25,9 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+# Global lock to prevent VTK threading issues
+_vtk_render_lock = threading.Lock()
 
 
 class RenderJobHandler(JobExecutor):
@@ -48,6 +52,12 @@ class RenderJobHandler(JobExecutor):
         """Execute a render job."""
         start_time = time.time()
         
+        # Use lock to prevent VTK threading issues
+        with _vtk_render_lock:
+            return self._execute_with_lock(job, progress_callback, start_time)
+    
+    def _execute_with_lock(self, job: Job, progress_callback: Optional[Callable], start_time: float) -> JobResult:
+        """Execute render job with VTK lock held."""
         if not RENDERING_AVAILABLE:
             return JobResult(
                 job_id=job.id,
@@ -222,6 +232,13 @@ class RenderJobHandler(JobExecutor):
             
             execution_time = time.time() - start_time
             
+            # Clean up renderer resources
+            if self.renderer:
+                try:
+                    self.renderer.cleanup()
+                except Exception as cleanup_error:
+                    logger.warning(f"Error during renderer cleanup: {cleanup_error}")
+            
             return JobResult(
                 job_id=job.id,
                 success=True,
@@ -236,6 +253,14 @@ class RenderJobHandler(JobExecutor):
         except Exception as e:
             execution_time = time.time() - start_time
             logger.exception(f"Render job {job.id} failed with exception")
+            
+            # Clean up renderer resources even on failure
+            if self.renderer:
+                try:
+                    self.renderer.cleanup()
+                except Exception as cleanup_error:
+                    logger.warning(f"Error during renderer cleanup after failure: {cleanup_error}")
+            
             return JobResult(
                 job_id=job.id,
                 success=False,
