@@ -1,13 +1,5 @@
-#!/usr/bin/env powershell
-<#
-.SYNOPSIS
-    Start STL Processor GUI in virtual environment
-.DESCRIPTION
-    Creates virtual environment if needed, installs dependencies, and launches the GUI
-#>
-
-# Set error handling
-$ErrorActionPreference = "Stop"
+# STL Processor GUI Launcher
+# Creates virtual environment if needed, installs dependencies, and launches the GUI
 
 Write-Host "🔧 STL Processor GUI Launcher" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
@@ -31,7 +23,8 @@ if (-not (Test-Path $venvPath)) {
         exit 1
     }
     Write-Host "✅ Virtual environment created" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "📦 Virtual environment already exists" -ForegroundColor Green
 }
 
@@ -56,7 +49,8 @@ if ($packageInstalled -ne "installed") {
         exit 1
     }
     Write-Host "✅ Package installed" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "✅ Package already installed" -ForegroundColor Green
 }
 
@@ -71,7 +65,8 @@ if ($moviepyInstalled -ne "installed") {
         exit 1
     }
     Write-Host "✅ moviepy installed" -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "✅ moviepy already installed" -ForegroundColor Green
 }
 
