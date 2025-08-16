@@ -550,21 +550,8 @@ class STLProcessorGUI:
                 logger.error("Job manager not initialized")
                 return
             
-            # Get user preferences from checkboxes
-            enable_image_rendering = getattr(self, 'image_rendering_var', None)
-            enable_video_rendering = getattr(self, 'video_rendering_var', None)
-            
-            # Default to True if variables don't exist yet (during initialization)
-            image_rendering = enable_image_rendering.get() if enable_image_rendering else True
-            video_rendering = enable_video_rendering.get() if enable_video_rendering else True
-            
-            # Create job options based on checkboxes
-            job_options = {
-                'analysis': True,      # Always enabled
-                'validation': True,    # Always enabled  
-                'image_rendering': image_rendering,
-                'video_rendering': video_rendering
-            }
+            # Get comprehensive parameters from all tabs
+            job_options = self.get_all_tab_parameters()
             
             # Use the configured output directory (with fallback if not initialized)
             if hasattr(self, 'current_output_folder') and self.current_output_folder:
@@ -583,10 +570,9 @@ class STLProcessorGUI:
                 output_dir.mkdir(parents=True, exist_ok=True)
                 logger.info(f"Using fallback output directory: {output_dir}")
             
-            # Add jobs to queue with processing options
-            # For now, we'll use "render" job type but log the options
+            # Add jobs to queue with comprehensive processing options
             job_ids = self.job_manager.add_jobs_from_files(
-                stl_files, output_dir, job_type="render"
+                stl_files, output_dir, job_type="render", options=job_options
             )
             
             logger.info(f"Added {len(job_ids)} jobs to queue with options: {job_options}")
@@ -615,6 +601,45 @@ class STLProcessorGUI:
                 f"Error adding files to batch queue: {e}",
                 exception=e
             )
+    
+    def get_all_tab_parameters(self):
+        """Collect parameters from all tabs for batch processing."""
+        return {
+            # Analysis tab parameters (always enabled for now)
+            'analysis': True,
+            
+            # Validation tab parameters  
+            'validation': True,
+            'repair_meshes': getattr(self, 'repair_var', None) and self.repair_var.get(),
+            
+            # Image Rendering tab parameters
+            'image_rendering': getattr(self, 'image_rendering_var', None) and self.image_rendering_var.get(),
+            'material': getattr(self, 'material_var', None) and self.material_var.get() or 'plastic',
+            'lighting': getattr(self, 'lighting_var', None) and self.lighting_var.get() or 'studio', 
+            'image_width': int(getattr(self, 'width_var', None) and self.width_var.get() or '1920'),
+            'image_height': int(getattr(self, 'height_var', None) and self.height_var.get() or '1080'),
+            'background_image': getattr(self, 'background_image_path', None),
+            
+            # Video Generator tab parameters
+            'video_rendering': getattr(self, 'video_rendering_var', None) and self.video_rendering_var.get(),
+            'video_format': getattr(self, 'video_format_var', None) and self.video_format_var.get() or 'mp4',
+            'video_quality': getattr(self, 'video_quality_var', None) and self.video_quality_var.get() or 'standard',
+            'video_duration': float(getattr(self, 'video_duration_var', None) and self.video_duration_var.get() or '8'),
+            
+            # Output configuration
+            'output_dir': getattr(self, 'current_output_folder', None) or self._get_default_output_folder()
+        }
+    
+    def get_first_queue_item(self):
+        """Get the first item in the queue for single-item processing."""
+        if not self.job_manager:
+            return None
+        
+        # Get pending jobs
+        pending_jobs = [job for job in self.job_manager.jobs.values() if job.status == 'pending']
+        if pending_jobs:
+            return pending_jobs[0]
+        return None
     
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""
@@ -702,7 +727,7 @@ class STLProcessorGUI:
     def create_rendering_tab(self):
         """Create the rendering tab."""
         self.rendering_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.rendering_frame, text="Rendering")
+        self.notebook.add(self.rendering_frame, text="Image Rendering")
         
         self.rendering_frame.columnconfigure(1, weight=1)
         self.rendering_frame.rowconfigure(2, weight=1)
@@ -795,7 +820,7 @@ class STLProcessorGUI:
     def create_generators_tab(self):
         """Create the generators tab for video and image generation."""
         self.generators_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.generators_frame, text="Generators")
+        self.notebook.add(self.generators_frame, text="Video Generator")
         
         self.generators_frame.columnconfigure(0, weight=1)
         self.generators_frame.rowconfigure(2, weight=1)
@@ -1824,9 +1849,11 @@ class STLProcessorGUI:
             self.bg_preview.config(text="ERR", image="", width=10, height=3)
     
     def render_image(self):
-        """Render an image of the current STL file."""
-        if not self.current_file or not self.processor:
-            messagebox.showwarning("Warning", "Please select an STL file first")
+        """Render an image using the first item in the queue with current tab parameters."""
+        # Check if we have items in queue
+        first_job = self.get_first_queue_item()
+        if not first_job:
+            messagebox.showwarning("Warning", "Please add STL files to the queue first")
             return
             
         # Check if rendering modules are available
@@ -1843,7 +1870,7 @@ class STLProcessorGUI:
             )
             return
             
-        def run_render():
+        def run_render(queue_item):
             renderer = None
             try:
                 self.status_var.set("Setting up renderer...")
@@ -1886,7 +1913,9 @@ class STLProcessorGUI:
                 self.progress_var.set(40)
                 self.status_var.set("Loading mesh...")
                 
-                if not renderer.setup_scene(self.current_file):
+                # Use the file from the queue item
+                queue_file = Path(queue_item.input_file)
+                if not renderer.setup_scene(queue_file):
                     raise Exception("Failed to setup rendering scene")
                     
                 self.progress_var.set(60)
@@ -1927,7 +1956,7 @@ class STLProcessorGUI:
                     f"Image rendering failed: {str(e)}",
                     exception=e,
                     context={
-                        "file_path": str(self.current_file),
+                        "file_path": str(queue_item.input_file),
                         "operation": "image rendering",
                         "render_width": self.width_var.get(),
                         "render_height": self.height_var.get(),
@@ -1949,7 +1978,7 @@ class STLProcessorGUI:
                         logger.warning(f"Error during renderer cleanup: {cleanup_error}")
                 self.progress_var.set(0)
                 
-        threading.Thread(target=run_render, daemon=True).start()
+        threading.Thread(target=lambda: run_render(first_job), daemon=True).start()
     
     def display_rendered_image(self, image_path: Path):
         """Display rendered image in the GUI."""
@@ -2040,9 +2069,11 @@ class STLProcessorGUI:
     
     # Generator methods
     def generate_rotation_video(self):
-        """Generate a 360° rotation video of the current model."""
-        if not self.current_file or not self.processor:
-            messagebox.showwarning("Warning", "Please select an STL file first")
+        """Generate a 360° rotation video using the first item in the queue with current tab parameters."""
+        # Check if we have items in queue
+        first_job = self.get_first_queue_item()
+        if not first_job:
+            messagebox.showwarning("Warning", "Please add STL files to the queue first")
             return
         
         if not GENERATORS_AVAILABLE:
@@ -2071,7 +2102,7 @@ class STLProcessorGUI:
         if not file_path:
             return
         
-        def run_generation():
+        def run_generation(queue_item):
             try:
                 # Clear log
                 self.generator_log.config(state=tk.NORMAL)
@@ -2100,7 +2131,9 @@ class STLProcessorGUI:
                 if not renderer.initialize():
                     raise Exception("Failed to initialize renderer")
                 
-                if not renderer.setup_scene(self.current_file):
+                # Use the file from the queue item
+                queue_file = Path(queue_item.input_file)
+                if not renderer.setup_scene(queue_file):
                     raise Exception("Failed to setup scene")
                 
                 # Apply current material and lighting settings
@@ -2130,7 +2163,7 @@ class STLProcessorGUI:
                     f"Failed to generate rotation video: {str(e)}",
                     exception=e,
                     context={
-                        "file_path": str(self.current_file),
+                        "file_path": str(queue_item.input_file),
                         "operation": "rotation video generation",
                         "video_format": self.video_format_var.get(),
                         "video_quality": self.video_quality_var.get()
@@ -2140,7 +2173,7 @@ class STLProcessorGUI:
                 self.generator_progress_var.set(0)
         
         # Run in separate thread
-        threading.Thread(target=run_generation, daemon=True).start()
+        threading.Thread(target=lambda: run_generation(first_job), daemon=True).start()
     
     def generate_multi_angle_video(self):
         """Generate a multi-angle video showing different views."""

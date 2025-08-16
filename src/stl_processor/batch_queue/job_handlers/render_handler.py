@@ -40,7 +40,8 @@ class RenderJobHandler(JobExecutor):
         if RENDERING_AVAILABLE:
             try:
                 self.processor = STLProcessor()
-                self.renderer = VTKRenderer()
+                # Renderer will be created per-job with job-specific dimensions
+                self.renderer = None
             except Exception as e:
                 logger.warning(f"Could not initialize rendering components: {e}")
     
@@ -120,6 +121,9 @@ class RenderJobHandler(JobExecutor):
             if progress_callback:
                 progress_callback(30.0, "Setting up renderer...")
             
+            # Create renderer with job-specific dimensions
+            self.renderer = VTKRenderer(image_width, image_height)
+            
             # Set up renderer by loading the STL file directly
             try:
                 success = self.renderer.setup_scene(input_file)
@@ -133,6 +137,24 @@ class RenderJobHandler(JobExecutor):
                             details={"input_file": str(input_file)}
                         )
                     )
+                
+                # Apply material and lighting settings from options
+                if hasattr(self.renderer, 'set_material'):
+                    try:
+                        from ...rendering.base_renderer import MaterialType
+                        material_type = MaterialType(material)
+                        self.renderer.set_material(material_type, (0.8, 0.8, 0.8))
+                    except Exception as mat_error:
+                        logger.warning(f"Failed to set material '{material}': {mat_error}")
+                
+                if hasattr(self.renderer, 'set_lighting'):
+                    try:
+                        from ...rendering.base_renderer import LightingPreset
+                        lighting_preset = LightingPreset(lighting)
+                        self.renderer.set_lighting(lighting_preset)
+                    except Exception as light_error:
+                        logger.warning(f"Failed to set lighting '{lighting}': {light_error}")
+                
             except Exception as e:
                 return JobResult(
                     job_id=job.id,
@@ -146,8 +168,17 @@ class RenderJobHandler(JobExecutor):
             
             # Extract options from job
             options = job.options or {}
-            generate_image = options.get("generate_image", True)
-            generate_video = options.get("generate_video", False)
+            generate_image = options.get("image_rendering", options.get("generate_image", True))
+            generate_video = options.get("video_rendering", options.get("generate_video", False))
+            
+            # Apply rendering parameters
+            material = options.get("material", "plastic")
+            lighting = options.get("lighting", "studio")
+            image_width = options.get("image_width", 1920)
+            image_height = options.get("image_height", 1080)
+            video_format = options.get("video_format", "mp4")
+            video_quality = options.get("video_quality", "standard") 
+            video_duration = options.get("video_duration", 8.0)
             
             generated_files = []
             
@@ -196,9 +227,9 @@ class RenderJobHandler(JobExecutor):
                 if progress_callback:
                     progress_callback(80.0, "Rendering video...")
                 
-                # Generate video output filename
+                # Generate video output filename with correct extension
                 video_output_dir = Path(options.get("output_dir", input_file.parent))
-                video_path = video_output_dir / f"{input_file.stem}_rotation.mp4"
+                video_path = video_output_dir / f"{input_file.stem}_rotation.{video_format}"
                 video_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 try:
@@ -206,15 +237,16 @@ class RenderJobHandler(JobExecutor):
                     from ...generators.video_generator import RotationVideoGenerator, VideoFormat, VideoQuality
                     video_gen = RotationVideoGenerator()
                     
-                    # Set up video parameters
-                    duration = options.get("video_duration", 8.0)
+                    # Convert string parameters to enums
+                    video_format_enum = VideoFormat(video_format)
+                    video_quality_enum = VideoQuality(video_quality)
                     
-                    # Generate rotation video using the renderer
+                    # Generate rotation video using the renderer with job parameters
                     success = video_gen.generate_rotation_video(
                         self.renderer, video_path, 
-                        video_format=VideoFormat.MP4,
-                        quality=VideoQuality.STANDARD,
-                        duration_seconds=duration
+                        video_format=video_format_enum,
+                        quality=video_quality_enum,
+                        duration_seconds=video_duration
                     )
                     
                     if success:
