@@ -67,10 +67,45 @@ class RotationVideoGenerator:
     def __init__(self):
         self.temp_dir = None
         self.progress_callback = None
-        self._check_dependencies()
+        self.dependencies_available = self._check_dependencies_soft()
+    
+    def _check_dependencies_soft(self):
+        """Check if required dependencies are available without raising exceptions."""
+        if not MOVIEPY_AVAILABLE:
+            # Try to import again to see if it works now
+            try:
+                from moviepy.editor import ImageSequenceClip, clips_array, concatenate_videoclips
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.MOVIEPY_AVAILABLE = True
+                current_module.ImageSequenceClip = ImageSequenceClip
+                current_module.clips_array = clips_array
+                current_module.concatenate_videoclips = concatenate_videoclips
+                logger.info("Successfully imported moviepy on retry")
+                return True
+            except ImportError as e:
+                logger.warning(f"moviepy not available: {e}")
+                return False
+        
+        if not PIL_AVAILABLE:
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.PIL_AVAILABLE = True
+                current_module.Image = Image
+                current_module.ImageDraw = ImageDraw
+                current_module.ImageFont = ImageFont
+                return True
+            except ImportError as e:
+                logger.warning(f"PIL not available: {e}")
+                return False
+        
+        return MOVIEPY_AVAILABLE and PIL_AVAILABLE
     
     def _check_dependencies(self):
-        """Check if required dependencies are available."""
+        """Check if required dependencies are available - raises exception if not."""
         if not MOVIEPY_AVAILABLE:
             # Try to import again to get more detailed error info
             try:
@@ -163,6 +198,10 @@ class RotationVideoGenerator:
         Returns:
             True if video generation succeeded, False otherwise
         """
+        # Check dependencies at runtime
+        if not self.dependencies_available:
+            self._check_dependencies()  # This will raise a detailed error
+        
         try:
             self._update_progress(0, "Initializing video generation...")
             

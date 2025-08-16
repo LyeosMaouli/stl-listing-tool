@@ -2120,6 +2120,15 @@ class STLProcessorGUI:
                 
                 # Create video generator
                 generator = RotationVideoGenerator()
+                
+                # Check if video generation is available
+                if not generator.dependencies_available:
+                    self.log_generator_message("❌ Video generation not available - moviepy not installed properly")
+                    self.log_generator_message("💡 You can still use image rendering and other features")
+                    self.log_generator_message("🔧 To fix: pip uninstall moviepy && pip install moviepy")
+                    self.update_generator_progress(0, "Video generation unavailable")
+                    return
+                
                 generator.set_progress_callback(self.update_generator_progress)
                 
                 # Get settings
