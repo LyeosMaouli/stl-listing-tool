@@ -203,6 +203,40 @@ class ProgressTracker:
             self._notify_job_observers(job_progress)
             self._update_queue_progress()
     
+    def start_job_tracking_v2(self, job):
+        """Start tracking progress for enhanced Job objects (job_types_v2)."""
+        from .job_types_v2 import Job as EnhancedJob, JobStatus
+        
+        with self._lock:
+            # Convert enhanced job to progress tracking format
+            from pathlib import Path
+            input_path = Path(job.input_file)
+            
+            # Map job status to JobState
+            state_mapping = {
+                JobStatus.PENDING: JobState.PENDING,
+                JobStatus.RUNNING: JobState.PROCESSING,
+                JobStatus.COMPLETED: JobState.COMPLETED,
+                JobStatus.FAILED: JobState.FAILED,
+                JobStatus.CANCELLED: JobState.CANCELLED
+            }
+            
+            job_progress = JobProgress(
+                job_id=job.id,
+                job_type=job.job_type,
+                stl_filename=input_path.name,
+                state=state_mapping.get(job.status, JobState.PENDING),
+                progress=0.0,
+                started_at=datetime.now(),
+                total_steps=self._estimate_job_steps_v2(job)
+            )
+            
+            self._job_progress[job.id] = job_progress
+            
+            logger.debug(f"Started tracking enhanced job {job.id}")
+            self._notify_job_observers(job_progress)
+            self._update_queue_progress()
+    
     def update_job_progress(
         self,
         job_id: str,
@@ -577,6 +611,30 @@ class ProgressTracker:
         
         if job.analysis_options:
             steps += 1
+        
+        return max(1, steps)
+    
+    def _estimate_job_steps_v2(self, job) -> int:
+        """Estimate number of processing steps for enhanced Job objects."""
+        steps = 1  # Base processing
+        
+        options = job.options if hasattr(job, 'options') else {}
+        
+        # Estimate based on job type and options
+        if job.job_type == "render":
+            if options.get("generate_image", True):
+                steps += 1
+            if options.get("generate_video", False):
+                steps += 2  # Video takes longer
+            if options.get("generate_size_chart", False):
+                steps += 1
+            if options.get("generate_color_variations", False):
+                color_count = len(options.get("color_palette", []))
+                steps += max(1, color_count)
+        elif job.job_type == "validate":
+            steps = 2  # Validation + report
+        elif job.job_type == "analyze":
+            steps = 2  # Analysis + report
         
         return max(1, steps)
     

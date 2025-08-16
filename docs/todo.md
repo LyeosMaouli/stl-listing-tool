@@ -13,6 +13,7 @@
 - [x] Save settings
 - [ ] Move ./batch_queue_state to ~/.local/stl_listing_tool/
 - [ ] Move all changing folders to `~/.local/stl_listing_tool/
+- [ ] Improve loading times
 
 ## Cleanup
 

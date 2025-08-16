@@ -15,17 +15,31 @@ import time
 from ..utils.logger import setup_logger
 
 # Import moviepy with fallback
+MOVIEPY_AVAILABLE = False
+ImageSequenceClip = None
+clips_array = None
+concatenate_videoclips = None
+
 try:
     from moviepy.editor import ImageSequenceClip, clips_array, concatenate_videoclips
     MOVIEPY_AVAILABLE = True
-except ImportError:
+except ImportError as initial_error:
+    # Store the initial error for debugging
+    _MOVIEPY_IMPORT_ERROR = initial_error
     MOVIEPY_AVAILABLE = False
 
 # Import PIL with fallback
+PIL_AVAILABLE = False
+Image = None
+ImageDraw = None
+ImageFont = None
+
 try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
-except ImportError:
+except ImportError as pil_error:
+    # Store the initial error for debugging
+    _PIL_IMPORT_ERROR = pil_error
     PIL_AVAILABLE = False
 
 logger = setup_logger("video_generator")
@@ -53,14 +67,96 @@ class RotationVideoGenerator:
     def __init__(self):
         self.temp_dir = None
         self.progress_callback = None
-        self._check_dependencies()
+        self.dependencies_available = self._check_dependencies_soft()
+    
+    def _check_dependencies_soft(self):
+        """Check if required dependencies are available without raising exceptions."""
+        if not MOVIEPY_AVAILABLE:
+            # Try to import again to see if it works now
+            try:
+                from moviepy.editor import ImageSequenceClip, clips_array, concatenate_videoclips
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.MOVIEPY_AVAILABLE = True
+                current_module.ImageSequenceClip = ImageSequenceClip
+                current_module.clips_array = clips_array
+                current_module.concatenate_videoclips = concatenate_videoclips
+                logger.info("Successfully imported moviepy on retry")
+                return True
+            except ImportError as e:
+                logger.warning(f"moviepy not available: {e}")
+                return False
+        
+        if not PIL_AVAILABLE:
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.PIL_AVAILABLE = True
+                current_module.Image = Image
+                current_module.ImageDraw = ImageDraw
+                current_module.ImageFont = ImageFont
+                return True
+            except ImportError as e:
+                logger.warning(f"PIL not available: {e}")
+                return False
+        
+        return MOVIEPY_AVAILABLE and PIL_AVAILABLE
     
     def _check_dependencies(self):
-        """Check if required dependencies are available."""
+        """Check if required dependencies are available - raises exception if not."""
         if not MOVIEPY_AVAILABLE:
-            raise ImportError("moviepy is required for video generation. Install with: pip install moviepy")
+            # Try to import again to get more detailed error info
+            try:
+                from moviepy.editor import ImageSequenceClip, clips_array, concatenate_videoclips
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.MOVIEPY_AVAILABLE = True
+                current_module.ImageSequenceClip = ImageSequenceClip
+                current_module.clips_array = clips_array
+                current_module.concatenate_videoclips = concatenate_videoclips
+                logger.info("Successfully imported moviepy on retry")
+            except ImportError as e:
+                import sys
+                # Get the original error if available
+                original_error = globals().get('_MOVIEPY_IMPORT_ERROR', e)
+                error_msg = (
+                    f"moviepy is required for video generation but import failed.\n"
+                    f"Original error: {original_error}\n"
+                    f"Retry error: {e}\n"
+                    f"Python executable: {sys.executable}\n"
+                    f"Please install with: pip install moviepy\n"
+                    f"Or try: python -m pip install moviepy\n"
+                    f"If already installed, check your Python environment."
+                )
+                raise ImportError(error_msg)
+        
         if not PIL_AVAILABLE:
-            raise ImportError("Pillow is required for image processing. Install with: pip install Pillow")
+            # Try to import again to get more detailed error info
+            try:
+                from PIL import Image, ImageDraw, ImageFont
+                # If this succeeds, update module-level variables
+                import sys
+                current_module = sys.modules[__name__]
+                current_module.PIL_AVAILABLE = True
+                current_module.Image = Image
+                current_module.ImageDraw = ImageDraw
+                current_module.ImageFont = ImageFont
+            except ImportError as e:
+                import sys
+                # Get the original error if available
+                original_error = globals().get('_PIL_IMPORT_ERROR', e)
+                error_msg = (
+                    f"Pillow is required for image processing but import failed.\n"
+                    f"Original error: {original_error}\n"
+                    f"Retry error: {e}\n"
+                    f"Python executable: {sys.executable}\n"
+                    f"Please install with: pip install Pillow\n"
+                    f"If already installed, check your Python environment."
+                )
+                raise ImportError(error_msg)
     
     def set_progress_callback(self, callback: Callable[[float, str], None]):
         """Set callback function for progress updates.
@@ -102,6 +198,10 @@ class RotationVideoGenerator:
         Returns:
             True if video generation succeeded, False otherwise
         """
+        # Check dependencies at runtime
+        if not self.dependencies_available:
+            self._check_dependencies()  # This will raise a detailed error
+        
         try:
             self._update_progress(0, "Initializing video generation...")
             

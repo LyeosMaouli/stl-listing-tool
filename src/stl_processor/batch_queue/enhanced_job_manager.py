@@ -141,8 +141,10 @@ class EnhancedJobManager:
             with self._lock:
                 job.status = JobStatus.RUNNING
                 self._running_jobs.add(job.id)
-                if job.id in self._pending_jobs:
-                    self._pending_jobs.remove(job.id)
+                # Job already removed from _pending_jobs in _process_next_jobs
+            
+            # Register job with progress tracker
+            self.progress_tracker.start_job_tracking_v2(job)
             
             logger.info(f"Job started: {job.id}")
             self._notify_job_observers("job_started", job)
@@ -153,6 +155,12 @@ class EnhancedJobManager:
                 job.status = JobStatus.COMPLETED
                 self._running_jobs.discard(job.id)
                 self._completed_jobs[job.id] = job
+            
+            # Notify progress tracker of completion
+            if result and result.execution_time:
+                self.progress_tracker.complete_job(job.id, result.execution_time)
+            else:
+                self.progress_tracker.complete_job(job.id, 0.0)
             
             self.error_handler.handle_success(job)
             logger.info(f"Job completed: {job.id}")
@@ -183,6 +191,9 @@ class EnhancedJobManager:
                     self._running_jobs.discard(job.id)
                     self._failed_jobs[job.id] = job
                     
+                    # Notify progress tracker of failure
+                    self.progress_tracker.fail_job(job.id, error.message)
+                    
                     logger.error(f"Job failed permanently: {job.id}")
                     self._notify_job_observers("job_failed", job)
                     self._checkpoint_if_needed()
@@ -191,6 +202,8 @@ class EnhancedJobManager:
                     self._process_next_jobs()
         
         def on_job_progress(job: Job, progress: float, message: str):
+            # Forward progress to progress tracker
+            self.progress_tracker.update_job_progress(job.id, progress, message)
             self._notify_job_observers("job_progress", job)
         
         self.execution_engine.on_job_started = on_job_started
@@ -506,10 +519,15 @@ class EnhancedJobManager:
                 if not self._pending_jobs:
                     break
                 
-                job_id = self._pending_jobs[0]  # Don't pop yet, will be removed in callback
+                job_id = self._pending_jobs.pop(0)  # Remove immediately to prevent duplicates
                 job = self._jobs.get(job_id)
                 
                 if job:
+                    # Check if job is already running to avoid race conditions
+                    if job_id in self._running_jobs:
+                        logger.warning(f"Job {job_id} already running, skipping duplicate submission")
+                        continue
+                    
                     future = self.execution_engine.submit_job(job)
                     self._job_futures[job_id] = future
                     logger.debug(f"Submitted job {job_id} for execution")

@@ -242,9 +242,6 @@ class STLProcessorGUI:
                 )
                 return
         
-        # Add batch queue tab
-        self.create_batch_queue_tab()
-        
         # Start update timer
         self.start_update_timer()
     
@@ -547,41 +544,54 @@ class STLProcessorGUI:
             )
     
     def add_files_to_batch_queue(self, stl_files):
-        """Add STL files to the batch processing queue."""
+        """Add STL files to batch queue with user-selected processing options."""
         try:
             if not self.job_manager:
                 logger.error("Job manager not initialized")
                 return
             
-            # Create output directory in user data location
-            import tempfile
-            import os
+            # Get comprehensive parameters from all tabs
+            job_options = self.get_all_tab_parameters()
             
-            if os.name == 'nt':  # Windows
-                output_dir = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "stl_processing_output"
-            else:  # Unix/Linux/Mac
-                output_dir = Path.home() / ".local" / "share" / "stl_listing_tool" / "stl_processing_output"
+            # Use the configured output directory (with fallback if not initialized)
+            if hasattr(self, 'current_output_folder') and self.current_output_folder:
+                output_dir = Path(self.current_output_folder)
+            else:
+                # Fallback if not initialized yet
+                output_dir = Path(self._get_default_output_folder())
             
-            # Fallback to temp directory if home directory fails
+            # Ensure the output directory exists
             try:
                 output_dir.mkdir(parents=True, exist_ok=True)
-            except (OSError, PermissionError):
-                output_dir = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
+            except (OSError, PermissionError) as e:
+                logger.warning(f"Could not create output directory {output_dir}: {e}")
+                # Fallback to default directory
+                output_dir = Path(self._get_default_output_folder())
                 output_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Using fallback output directory: {output_dir}")
             
-            # Add jobs to queue
+            # Add jobs to queue with comprehensive processing options
             job_ids = self.job_manager.add_jobs_from_files(
-                stl_files, output_dir, job_type="render"
+                stl_files, output_dir, job_type="render", options=job_options
             )
             
-            logger.info(f"Added {len(job_ids)} jobs to queue")
+            logger.info(f"Added {len(job_ids)} jobs to queue with options: {job_options}")
+            
+            # Create descriptive status message
+            enabled_processes = []
+            if job_options['image_rendering']:
+                enabled_processes.append("Images")
+            if job_options['video_rendering']:
+                enabled_processes.append("Videos")
+            
+            process_text = " + ".join(enabled_processes) if enabled_processes else "Analysis only"
             
             # Update status
-            self.file_status_var.set(f"Added {len(stl_files)} STL files to queue")
+            self.file_status_var.set(f"Added {len(stl_files)} STL files to queue ({process_text})")
             
             messagebox.showinfo(
                 "Files Added", 
-                f"Added {len(stl_files)} STL files to batch queue"
+                f"Added {len(stl_files)} STL files to batch queue\nProcessing: Analysis + Validation + {process_text}"
             )
             
         except Exception as e:
@@ -591,6 +601,52 @@ class STLProcessorGUI:
                 f"Error adding files to batch queue: {e}",
                 exception=e
             )
+    
+    def get_all_tab_parameters(self):
+        """Collect parameters from all tabs for batch processing."""
+        return {
+            # Analysis tab parameters (always enabled for now)
+            'analysis': True,
+            
+            # Validation tab parameters  
+            'validation': True,
+            'repair_meshes': getattr(self, 'repair_var', None) and self.repair_var.get(),
+            
+            # Image Rendering tab parameters
+            'image_rendering': getattr(self, 'image_rendering_var', None) and self.image_rendering_var.get(),
+            'material': getattr(self, 'material_var', None) and self.material_var.get() or 'plastic',
+            'lighting': getattr(self, 'lighting_var', None) and self.lighting_var.get() or 'studio', 
+            'image_width': int(getattr(self, 'width_var', None) and self.width_var.get() or '1920'),
+            'image_height': int(getattr(self, 'height_var', None) and self.height_var.get() or '1080'),
+            'background_image': getattr(self, 'background_image_path', None),
+            
+            # Video Generator tab parameters
+            'video_rendering': getattr(self, 'video_rendering_var', None) and self.video_rendering_var.get(),
+            'video_format': getattr(self, 'video_format_var', None) and self.video_format_var.get() or 'mp4',
+            'video_quality': getattr(self, 'video_quality_var', None) and self.video_quality_var.get() or 'standard',
+            'video_duration': float(getattr(self, 'video_duration_var', None) and self.video_duration_var.get() or '8'),
+            
+            # Output configuration
+            'output_dir': getattr(self, 'current_output_folder', None) or self._get_default_output_folder()
+        }
+    
+    def get_first_queue_item(self):
+        """Get the first item in the queue for single-item processing."""
+        if not self.job_manager:
+            return None
+        
+        try:
+            # Import JobStatus for comparison
+            from .batch_queue.job_types_v2 import JobStatus
+            
+            # Get pending jobs
+            pending_jobs = [job for job in self.job_manager._jobs.values() if job.status == JobStatus.PENDING]
+            if pending_jobs:
+                return pending_jobs[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting first queue item: {e}")
+            return None
     
     def get_temp_render_path(self):
         """Get a safe temporary path for rendering output."""
@@ -605,10 +661,14 @@ class STLProcessorGUI:
         return temp_dir / "stl_render.png"
     
     def create_notebook(self):
-        """Create notebook with all tabs."""
+        """Create notebook with batch queue as first tab (primary focus)."""
         self.notebook = ttk.Notebook(self.main_frame)
         self.notebook.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
+        # Batch Queue first (primary focus for batch processing)
+        self.create_batch_queue_tab()
+        
+        # Individual processing tabs
         self.create_analysis_tab()
         self.create_validation_tab()
         self.create_rendering_tab()
@@ -674,7 +734,7 @@ class STLProcessorGUI:
     def create_rendering_tab(self):
         """Create the rendering tab."""
         self.rendering_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.rendering_frame, text="Rendering")
+        self.notebook.add(self.rendering_frame, text="Image Rendering")
         
         self.rendering_frame.columnconfigure(1, weight=1)
         self.rendering_frame.rowconfigure(2, weight=1)
@@ -767,7 +827,7 @@ class STLProcessorGUI:
     def create_generators_tab(self):
         """Create the generators tab for video and image generation."""
         self.generators_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.generators_frame, text="Generators")
+        self.notebook.add(self.generators_frame, text="Video Generator")
         
         self.generators_frame.columnconfigure(0, weight=1)
         self.generators_frame.rowconfigure(2, weight=1)
@@ -863,39 +923,89 @@ class STLProcessorGUI:
         self.create_progress_panel()
     
     def create_queue_controls(self):
-        """Create queue control buttons."""
+        """Create enhanced queue control buttons and processing options."""
         control_frame = ttk.LabelFrame(self.batch_tab, text="Queue Controls", padding="10")
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+        control_frame.columnconfigure(3, weight=1)  # Spacer column to separate buttons and options
         
-        # Control buttons
+        # Left side: Control buttons
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=0, column=0, sticky=tk.W)
+        
+        # Buttons: Start, Pause, Stop, Restart, Clear
         self.control_buttons['start'] = ttk.Button(
-            control_frame, text="Start Processing", 
+            button_frame, text="Start Processing", 
             command=self.start_processing
         )
         self.control_buttons['start'].grid(row=0, column=0, padx=(0, 5))
         
         self.control_buttons['pause'] = ttk.Button(
-            control_frame, text="Pause", 
+            button_frame, text="Pause", 
             command=self.pause_processing, state="disabled"
         )
         self.control_buttons['pause'].grid(row=0, column=1, padx=5)
         
         self.control_buttons['stop'] = ttk.Button(
-            control_frame, text="Stop", 
+            button_frame, text="Stop", 
             command=self.stop_processing, state="disabled"
         )
         self.control_buttons['stop'].grid(row=0, column=2, padx=5)
         
+        # NEW: Restart button
+        self.control_buttons['restart'] = ttk.Button(
+            button_frame, text="Restart", 
+            command=self.restart_processing
+        )
+        self.control_buttons['restart'].grid(row=0, column=3, padx=5)
+        
         self.control_buttons['clear'] = ttk.Button(
-            control_frame, text="Clear Completed", 
+            button_frame, text="Clear Completed", 
             command=self.clear_completed
         )
-        self.control_buttons['clear'].grid(row=0, column=3, padx=(5, 0))
+        self.control_buttons['clear'].grid(row=0, column=4, padx=(5, 0))
         
-        # Queue info
+        # Middle: Output folder selection (NEW)
+        output_frame = ttk.Frame(control_frame)
+        output_frame.grid(row=0, column=1, padx=(20, 20))
+        
+        ttk.Button(
+            output_frame, text="Output Folder...", 
+            command=self.select_output_folder
+        ).grid(row=0, column=0)
+        
+        # Initialize and display current output folder
+        self.current_output_folder = self.user_config.get('output_folder', self._get_default_output_folder())
+        self.output_folder_var = tk.StringVar(value=self._format_folder_display(self.current_output_folder))
+        ttk.Label(
+            output_frame, textvariable=self.output_folder_var,
+            foreground="gray", font=('TkDefaultFont', 8)
+        ).grid(row=1, column=0, sticky=tk.W, pady=(2, 0))
+        
+        # Right side: Processing options
+        options_frame = ttk.LabelFrame(control_frame, text="Processing Options", padding="5")
+        options_frame.grid(row=0, column=4, sticky=tk.E, padx=(20, 0))
+        
+        # Initialize processing option variables with user settings
+        self.image_rendering_var = tk.BooleanVar(value=self.user_config.get('enable_image_rendering', True))
+        self.video_rendering_var = tk.BooleanVar(value=self.user_config.get('enable_video_rendering', True))
+        
+        # Create checkboxes
+        ttk.Checkbutton(
+            options_frame, text="Image Rendering", 
+            variable=self.image_rendering_var,
+            command=self.on_processing_option_changed
+        ).grid(row=0, column=0, padx=(0, 10), sticky=tk.W)
+        
+        ttk.Checkbutton(
+            options_frame, text="Video Rendering", 
+            variable=self.video_rendering_var,
+            command=self.on_processing_option_changed
+        ).grid(row=0, column=1, sticky=tk.W)
+        
+        # Queue info (spans full width)
         self.queue_info_var = tk.StringVar(value="Queue empty")
         ttk.Label(control_frame, textvariable=self.queue_info_var).grid(
-            row=1, column=0, columnspan=4, sticky=tk.W, pady=(10, 0)
+            row=1, column=0, columnspan=5, sticky=tk.W, pady=(10, 0)
         )
     
     def create_job_list(self):
@@ -1026,6 +1136,161 @@ class STLProcessorGUI:
                 messagebox.showinfo("No Jobs", "No completed jobs to clear")
         except Exception as e:
             logger.error(f"Error clearing completed jobs: {e}")
+    
+    def restart_processing(self):
+        """Reset job statuses to restart processing (keeps jobs in queue)."""
+        if not self.job_manager:
+            return
+        
+        try:
+            # Stop current processing if running
+            if self.job_manager.is_running:
+                response = messagebox.askyesno(
+                    "Restart Processing",
+                    "This will stop current processing and reset all job statuses to pending. The jobs will remain in the queue. Continue?"
+                )
+                if not response:
+                    return
+                    
+                self.job_manager.stop_processing()
+            
+            # Reset job statuses only (don't clear the queue)
+            if hasattr(self.job_manager, 'reset_job_statuses'):
+                count = self.job_manager.reset_job_statuses()
+            else:
+                # Fallback: reset progress tracking only
+                count = 0
+                if hasattr(self.job_manager, 'progress_tracker'):
+                    self.job_manager.progress_tracker.reset_tracking()
+            
+            # Reset control button states
+            self.control_buttons['start'].config(state="normal")
+            self.control_buttons['pause'].config(state="disabled", text="Pause")
+            self.control_buttons['stop'].config(state="disabled")
+            
+            # Update job tree display to show reset statuses (don't clear jobs)
+            if hasattr(self, 'job_tree'):
+                for item in self.job_tree.get_children():
+                    # Update existing items to show "pending" status instead of deleting them
+                    values = list(self.job_tree.item(item)['values'])
+                    if len(values) >= 2:
+                        values[1] = "pending"  # Status column
+                        values[2] = "0%"       # Progress column
+                        self.job_tree.item(item, values=values)
+            
+            # Reset progress display
+            if hasattr(self, 'overall_progress'):
+                self.overall_progress['value'] = 0
+            if hasattr(self, 'progress_text_var'):
+                self.progress_text_var.set("Ready to process")
+            
+            # Update queue info to reflect reset
+            if hasattr(self, 'queue_info_var') and self.job_manager:
+                try:
+                    summary = self.job_manager.get_queue_summary()
+                    total = summary.get('total_jobs', 0)
+                    self.queue_info_var.set(f"All {total} jobs reset to pending - ready to start")
+                except:
+                    self.queue_info_var.set("Job statuses reset - ready to start")
+            
+            logger.info("Batch queue job statuses reset by user")
+            messagebox.showinfo("Processing Reset", "All job statuses have been reset to pending. Jobs remain in queue and are ready to process again.")
+            
+        except Exception as e:
+            logger.error(f"Error resetting job statuses: {e}")
+            show_error_with_logging(
+                self.root, "Restart Error",
+                f"Error resetting job statuses: {e}",
+                exception=e
+            )
+    
+    def on_processing_option_changed(self):
+        """Handle changes to processing options (checkboxes)."""
+        try:
+            # Save user preferences
+            self.user_config.set('enable_image_rendering', self.image_rendering_var.get())
+            self.user_config.set('enable_video_rendering', self.video_rendering_var.get())
+            
+            # Update status to show current settings
+            image_status = "✓" if self.image_rendering_var.get() else "✗"
+            video_status = "✓" if self.video_rendering_var.get() else "✗"
+            
+            logger.info(f"Processing options updated: Image {image_status}, Video {video_status}")
+            
+        except Exception as e:
+            logger.error(f"Error updating processing options: {e}")
+    
+    def select_output_folder(self):
+        """Open folder selection dialog for output directory."""
+        try:
+            # Get current folder or default
+            initial_folder = self.current_output_folder
+            
+            # Open folder selection dialog
+            selected_folder = filedialog.askdirectory(
+                title="Select Output Folder for Processed STL Files",
+                initialdir=initial_folder
+            )
+            
+            if selected_folder:
+                # Update current folder
+                self.current_output_folder = selected_folder
+                
+                # Save to user configuration
+                self.user_config.set('output_folder', selected_folder)
+                
+                # Update display
+                self.output_folder_var.set(self._format_folder_display(selected_folder))
+                
+                logger.info(f"Output folder updated to: {selected_folder}")
+                
+                # Show confirmation
+                messagebox.showinfo(
+                    "Output Folder Updated", 
+                    f"Output folder set to:\n{selected_folder}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error selecting output folder: {e}")
+            show_error_with_logging(
+                self.root, "Folder Selection Error",
+                f"Error selecting output folder: {e}",
+                exception=e
+            )
+    
+    def _get_default_output_folder(self):
+        """Get the default output folder based on platform."""
+        import tempfile
+        import os
+        
+        if os.name == 'nt':  # Windows
+            default_folder = Path.home() / "AppData" / "Local" / "stl_listing_tool" / "stl_processing_output"
+        else:  # Unix/Linux/Mac
+            default_folder = Path.home() / ".local" / "share" / "stl_listing_tool" / "stl_processing_output"
+        
+        # Ensure the folder exists
+        try:
+            default_folder.mkdir(parents=True, exist_ok=True)
+            return str(default_folder)
+        except (OSError, PermissionError):
+            # Fallback to temp directory
+            fallback_folder = Path(tempfile.gettempdir()) / "stl_listing_tool" / "stl_processing_output"
+            fallback_folder.mkdir(parents=True, exist_ok=True)
+            return str(fallback_folder)
+    
+    def _format_folder_display(self, folder_path):
+        """Format folder path for display (truncate if too long)."""
+        if not folder_path:
+            return "No folder selected"
+            
+        path_str = str(folder_path)
+        max_length = 50
+        
+        if len(path_str) <= max_length:
+            return path_str
+        else:
+            # Truncate in the middle, showing start and end
+            return f"{path_str[:20]}...{path_str[-25:]}"
     
     # Observer callbacks
     def on_queue_state_changed(self, summary: Dict[str, Any]):
@@ -1591,9 +1856,11 @@ class STLProcessorGUI:
             self.bg_preview.config(text="ERR", image="", width=10, height=3)
     
     def render_image(self):
-        """Render an image of the current STL file."""
-        if not self.current_file or not self.processor:
-            messagebox.showwarning("Warning", "Please select an STL file first")
+        """Render an image using the first item in the queue with current tab parameters."""
+        # Check if we have items in queue
+        first_job = self.get_first_queue_item()
+        if not first_job:
+            messagebox.showwarning("Warning", "Please add STL files to the queue first")
             return
             
         # Check if rendering modules are available
@@ -1610,7 +1877,7 @@ class STLProcessorGUI:
             )
             return
             
-        def run_render():
+        def run_render(queue_item):
             renderer = None
             try:
                 self.status_var.set("Setting up renderer...")
@@ -1653,7 +1920,9 @@ class STLProcessorGUI:
                 self.progress_var.set(40)
                 self.status_var.set("Loading mesh...")
                 
-                if not renderer.setup_scene(self.current_file):
+                # Use the file from the queue item
+                queue_file = Path(queue_item.input_file)
+                if not renderer.setup_scene(queue_file):
                     raise Exception("Failed to setup rendering scene")
                     
                 self.progress_var.set(60)
@@ -1694,7 +1963,7 @@ class STLProcessorGUI:
                     f"Image rendering failed: {str(e)}",
                     exception=e,
                     context={
-                        "file_path": str(self.current_file),
+                        "file_path": str(queue_item.input_file),
                         "operation": "image rendering",
                         "render_width": self.width_var.get(),
                         "render_height": self.height_var.get(),
@@ -1716,7 +1985,7 @@ class STLProcessorGUI:
                         logger.warning(f"Error during renderer cleanup: {cleanup_error}")
                 self.progress_var.set(0)
                 
-        threading.Thread(target=run_render, daemon=True).start()
+        threading.Thread(target=lambda: run_render(first_job), daemon=True).start()
     
     def display_rendered_image(self, image_path: Path):
         """Display rendered image in the GUI."""
@@ -1807,9 +2076,11 @@ class STLProcessorGUI:
     
     # Generator methods
     def generate_rotation_video(self):
-        """Generate a 360° rotation video of the current model."""
-        if not self.current_file or not self.processor:
-            messagebox.showwarning("Warning", "Please select an STL file first")
+        """Generate a 360° rotation video using the first item in the queue with current tab parameters."""
+        # Check if we have items in queue
+        first_job = self.get_first_queue_item()
+        if not first_job:
+            messagebox.showwarning("Warning", "Please add STL files to the queue first")
             return
         
         if not GENERATORS_AVAILABLE:
@@ -1838,7 +2109,7 @@ class STLProcessorGUI:
         if not file_path:
             return
         
-        def run_generation():
+        def run_generation(queue_item):
             try:
                 # Clear log
                 self.generator_log.config(state=tk.NORMAL)
@@ -1849,6 +2120,22 @@ class STLProcessorGUI:
                 
                 # Create video generator
                 generator = RotationVideoGenerator()
+                
+                # Check if video generation is available
+                if not generator.dependencies_available:
+                    self.log_generator_message("⚠️ MoviePy not available, trying OpenCV alternative...")
+                    
+                    # Try OpenCV alternative
+                    try:
+                        from .generators.opencv_video_generator import OpenCVVideoGenerator
+                        generator = OpenCVVideoGenerator()
+                        self.log_generator_message("✅ Using OpenCV video generator")
+                    except ImportError:
+                        self.log_generator_message("❌ Video generation not available - neither moviepy nor opencv available")
+                        self.log_generator_message("💡 Install either: pip install moviepy OR pip install opencv-python")
+                        self.update_generator_progress(0, "Video generation unavailable")
+                        return
+                
                 generator.set_progress_callback(self.update_generator_progress)
                 
                 # Get settings
@@ -1867,7 +2154,9 @@ class STLProcessorGUI:
                 if not renderer.initialize():
                     raise Exception("Failed to initialize renderer")
                 
-                if not renderer.setup_scene(self.current_file):
+                # Use the file from the queue item
+                queue_file = Path(queue_item.input_file)
+                if not renderer.setup_scene(queue_file):
                     raise Exception("Failed to setup scene")
                 
                 # Apply current material and lighting settings
@@ -1877,10 +2166,22 @@ class STLProcessorGUI:
                 lighting_preset = LightingPreset(self.lighting_var.get())
                 renderer.set_lighting(lighting_preset)
                 
-                # Generate video
-                success = generator.generate_rotation_video(
-                    renderer, Path(file_path), video_format, video_quality, duration
-                )
+                # Generate video (adapt parameters based on generator type)
+                try:
+                    if hasattr(generator, 'dependencies_available'):
+                        # MoviePy generator
+                        success = generator.generate_rotation_video(
+                            renderer, Path(file_path), video_format, video_quality, duration
+                        )
+                    else:
+                        # OpenCV generator - simpler interface
+                        fps = 30 if video_quality.value == 'standard' else 60
+                        success = generator.generate_rotation_video(
+                            renderer, Path(file_path), video_format.value, fps, duration
+                        )
+                except Exception as e:
+                    self.log_generator_message(f"✗ Video generation error: {e}")
+                    success = False
                 
                 if success:
                     self.log_generator_message(f"✓ Video saved successfully: {file_path}")
@@ -1897,7 +2198,7 @@ class STLProcessorGUI:
                     f"Failed to generate rotation video: {str(e)}",
                     exception=e,
                     context={
-                        "file_path": str(self.current_file),
+                        "file_path": str(queue_item.input_file),
                         "operation": "rotation video generation",
                         "video_format": self.video_format_var.get(),
                         "video_quality": self.video_quality_var.get()
@@ -1907,7 +2208,7 @@ class STLProcessorGUI:
                 self.generator_progress_var.set(0)
         
         # Run in separate thread
-        threading.Thread(target=run_generation, daemon=True).start()
+        threading.Thread(target=lambda: run_generation(first_job), daemon=True).start()
     
     def generate_multi_angle_video(self):
         """Generate a multi-angle video showing different views."""
