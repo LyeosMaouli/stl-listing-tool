@@ -2123,11 +2123,18 @@ class STLProcessorGUI:
                 
                 # Check if video generation is available
                 if not generator.dependencies_available:
-                    self.log_generator_message("❌ Video generation not available - moviepy not installed properly")
-                    self.log_generator_message("💡 You can still use image rendering and other features")
-                    self.log_generator_message("🔧 To fix: pip uninstall moviepy && pip install moviepy")
-                    self.update_generator_progress(0, "Video generation unavailable")
-                    return
+                    self.log_generator_message("⚠️ MoviePy not available, trying OpenCV alternative...")
+                    
+                    # Try OpenCV alternative
+                    try:
+                        from ..generators.opencv_video_generator import OpenCVVideoGenerator
+                        generator = OpenCVVideoGenerator()
+                        self.log_generator_message("✅ Using OpenCV video generator")
+                    except ImportError:
+                        self.log_generator_message("❌ Video generation not available - neither moviepy nor opencv available")
+                        self.log_generator_message("💡 Install either: pip install moviepy OR pip install opencv-python")
+                        self.update_generator_progress(0, "Video generation unavailable")
+                        return
                 
                 generator.set_progress_callback(self.update_generator_progress)
                 
@@ -2159,10 +2166,22 @@ class STLProcessorGUI:
                 lighting_preset = LightingPreset(self.lighting_var.get())
                 renderer.set_lighting(lighting_preset)
                 
-                # Generate video
-                success = generator.generate_rotation_video(
-                    renderer, Path(file_path), video_format, video_quality, duration
-                )
+                # Generate video (adapt parameters based on generator type)
+                try:
+                    if hasattr(generator, 'dependencies_available'):
+                        # MoviePy generator
+                        success = generator.generate_rotation_video(
+                            renderer, Path(file_path), video_format, video_quality, duration
+                        )
+                    else:
+                        # OpenCV generator - simpler interface
+                        fps = 30 if video_quality.value == 'standard' else 60
+                        success = generator.generate_rotation_video(
+                            renderer, Path(file_path), video_format.value, fps, duration
+                        )
+                except Exception as e:
+                    self.log_generator_message(f"✗ Video generation error: {e}")
+                    success = False
                 
                 if success:
                     self.log_generator_message(f"✓ Video saved successfully: {file_path}")

@@ -6,8 +6,9 @@ open3d>=0.19.0
 # 3D rendering
 vtk>=9.2.0
 
-# Video generation
+# Video generation (either moviepy OR opencv-python)
 moviepy>=1.0.3
+opencv-python>=4.5.0  # Alternative to moviepy for video generation
 Pillow>=10.0.0
 
 # Configuration and CLI
